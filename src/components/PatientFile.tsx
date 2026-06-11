@@ -65,7 +65,7 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden flex flex-col h-full relative"
+      className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden relative w-full"
     >
       {/* Header */}
       <div className="bg-slate-50 dark:bg-slate-800 p-6 flex justify-between items-start md:items-center border-b border-slate-100 dark:border-slate-800 flex-col md:flex-row gap-4">
@@ -122,7 +122,7 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-6 bg-slate-50/30 dark:bg-slate-900/50 overflow-y-auto w-full">
+      <div className="p-6 bg-slate-50/30 dark:bg-slate-900/50 w-full">
         <AnimatePresence mode="wait">
           {activeTab === 'anamnesis' && (
             <motion.div

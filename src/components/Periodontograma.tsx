@@ -687,10 +687,6 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                         </linearGradient>
                       </defs>
 
-                      {/* Reference line for the CEJ (Cementum Enamel Junction) at Y=80 */}
-                      <line x1="10" y1="80" x2="90" y2="80" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3,3" />
-                      <text x="5" y="83" fill="#94a3b8" className="text-[6px] font-bold">CEJ</text>
-
                       {/* Tooth Anatomy drawings based on FDI specifications */}
                       {toothIsMissing ? (
                         /* Missing representation */
@@ -763,52 +759,241 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
 
                         return (
                           <g>
+                            {/* Horizontal Millimeter Scale Grid (PerioTools style) */}
+                            {/* CEJ / Baseline 0 Line */}
+                            <line 
+                              x1="12" 
+                              y1={yCEJ} 
+                              x2="88" 
+                              y2={yCEJ} 
+                              stroke="#0d9488" 
+                              strokeWidth="0.8" 
+                              strokeDasharray="3,2" 
+                              opacity="0.8"
+                            />
+                            <text 
+                              x="8" 
+                              y="82" 
+                              fill="#0d9488" 
+                              className="text-[6px] font-mono font-black select-none text-right dark:fill-teal-400" 
+                              textAnchor="end"
+                            >
+                              0
+                            </text>
+                            <text 
+                              x="92" 
+                              y="82" 
+                              fill="#0d9488" 
+                              className="text-[6px] font-mono font-black select-none text-start dark:fill-teal-400" 
+                              textAnchor="start"
+                            >
+                              0
+                            </text>
+
+                            {/* Rootward Milimeter Lines: Even & Odd */}
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((mm) => {
+                              const yLine = yCEJ + (mm * scale * direction);
+                              const isEven = mm % 2 === 0;
+                              return (
+                                <g key={`root-grid-${mm}`} opacity={isEven ? "0.4" : "0.15"}>
+                                  <line 
+                                    x1="12" 
+                                    y1={yLine} 
+                                    x2="88" 
+                                    y2={yLine} 
+                                    stroke={isEven ? "#64748b" : "#94a3b8"} 
+                                    strokeWidth={isEven ? "0.6" : "0.4"} 
+                                    strokeDasharray={isEven ? "2,2" : "1,3"} 
+                                  />
+                                  {isEven && (
+                                    <>
+                                      <text 
+                                        x="8" 
+                                        y={yLine + 2} 
+                                        fill="#64748b" 
+                                        className="text-[5px] font-mono font-bold select-none text-right dark:fill-slate-400"
+                                        textAnchor="end"
+                                      >
+                                        {mm}
+                                      </text>
+                                      <text 
+                                        x="92" 
+                                        y={yLine + 2} 
+                                        fill="#64748b" 
+                                        className="text-[5px] font-mono font-bold select-none text-start dark:fill-slate-400"
+                                        textAnchor="start"
+                                      >
+                                        {mm}
+                                      </text>
+                                    </>
+                                  )}
+                                </g>
+                              );
+                            })}
+
+                            {/* Crownward Milimeter Lines (for hyperplasia) */}
+                            {[1, 2, 3, 4].map((mm) => {
+                              const yLine = yCEJ - (mm * scale * direction);
+                              const isEven = mm % 2 === 0;
+                              return (
+                                <g key={`crown-grid-${mm}`} opacity={isEven ? "0.2" : "0.1"}>
+                                  <line 
+                                    x1="12" 
+                                    y1={yLine} 
+                                    x2="88" 
+                                    y2={yLine} 
+                                    stroke="#64748b" 
+                                    strokeWidth="0.5" 
+                                    strokeDasharray="1,2" 
+                                  />
+                                  {isEven && (
+                                    <>
+                                      <text 
+                                        x="8" 
+                                        y={yLine + 2} 
+                                        fill="#64748b" 
+                                        className="text-[4.5px] font-mono font-semibold select-none text-right dark:fill-slate-500"
+                                        textAnchor="end"
+                                      >
+                                        -{mm}
+                                      </text>
+                                      <text 
+                                        x="92" 
+                                        y={yLine + 2} 
+                                        fill="#64748b" 
+                                        className="text-[4.5px] font-mono font-semibold select-none text-start dark:fill-slate-500"
+                                        textAnchor="start"
+                                      >
+                                        -{mm}
+                                      </text>
+                                    </>
+                                  )}
+                                </g>
+                              );
+                            })}
+
                             {/* Area shaded between CEJ and pocket bottom showing loss of insertion */}
                             <path 
-                              d={`M ${xMesial},${yCEJ} L ${xCentral},${yCEJ} L ${xDistal},${yCEJ} L ${xDistal},${yPocketD} L ${xCentral},${yPocketC} L ${xMesial},${yPocketM} Z`}
-                              fill="rgba(244, 63, 94, 0.15)"
+                              d={`M 15,${yCEJ} L ${xMesial},${yCEJ} L ${xCentral},${yCEJ} L ${xDistal},${yCEJ} L 85,${yCEJ} L 85,${yPocketD} L ${xDistal},${yPocketD} L ${xCentral},${yPocketC} L ${xMesial},${yPocketM} L 15,${yPocketM} Z`}
+                              fill="rgba(244, 63, 94, 0.12)"
                               stroke="none"
                             />
 
-                            {/* Gingival Margin line (Blue/cyan) */}
+                            {/* Gingival Margin line (Blue/cyan) - Clinical Polyline passing exactly through nodes */}
                             <path 
-                              d={`M 15,${yMarginM - 1} Q ${xMesial},${yMarginM} ${xCentral},${yMarginC} T 85,${yMarginD - 1}`}
+                              d={`M 12,${yMarginM} L ${xMesial},${yMarginM} L ${xCentral},${yMarginC} L ${xDistal},${yMarginD} L 88,${yMarginD}`}
                               fill="none"
                               stroke="#06b6d4" 
                               strokeWidth="2.5" 
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
                             />
 
-                            {/* Pocket base path (Red) */}
+                            {/* Pocket base path (Red) - Clinical Polyline passing exactly through nodes */}
                             <path 
-                              d={`M 15,${yPocketM} Q ${xMesial},${yPocketM} ${xCentral},${yPocketC} T 85,${yPocketD}`}
+                              d={`M 12,${yPocketM} L ${xMesial},${yPocketM} L ${xCentral},${yPocketC} L ${xDistal},${yPocketD} L 88,${yPocketD}`}
                               fill="none" 
                               stroke="#ef4444" 
                               strokeWidth="2.5" 
-                              strokeDasharray="1,1"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeDasharray="2,2"
                             />
 
-                            {/* Keypad selector markers representation if keyboard mode is active */}
-                            {keyboardMode && (
-                              <g>
-                                <circle 
-                                  cx={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
-                                  cy={inputPosition === "mesial" ? yPocketM : inputPosition === "central" ? yPocketC : yPocketD} 
-                                  r="5" 
-                                  fill="#14b8a6" 
-                                  stroke="#ffffff" 
-                                  strokeWidth="1.5"
-                                  className="animate-ping"
-                                />
-                                <circle 
-                                  cx={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
-                                  cy={inputPosition === "mesial" ? yPocketM : inputPosition === "central" ? yPocketC : yPocketD} 
-                                  r="4" 
-                                  fill="#0d9488" 
-                                  stroke="#ffffff" 
-                                  strokeWidth="1"
-                                />
-                              </g>
-                            )}
+                            {/* Node markers for Gingival Margin (Cyan) */}
+                            <g>
+                              <circle cx={xMesial} cy={yMarginM} r="2.5" fill="#06b6d4" stroke="#ffffff" strokeWidth="0.8" />
+                              <circle cx={xCentral} cy={yMarginC} r="2.5" fill="#06b6d4" stroke="#ffffff" strokeWidth="0.8" />
+                              <circle cx={xDistal} cy={yMarginD} r="2.5" fill="#06b6d4" stroke="#ffffff" strokeWidth="0.8" />
+                            </g>
+
+                            {/* Node markers for Pocket Bottom (Red) */}
+                            <g>
+                              <circle cx={xMesial} cy={yPocketM} r="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="0.8" />
+                              <circle cx={xCentral} cy={yPocketC} r="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="0.8" />
+                              <circle cx={xDistal} cy={yPocketD} r="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="0.8" />
+                            </g>
+
+                            {/* Active position vertical dashed guide */}
+                            <line 
+                              x1={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
+                              y1="10"
+                              x2={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
+                              y2="150"
+                              stroke="#0d9488"
+                              strokeWidth="1"
+                              strokeDasharray="2,2"
+                              opacity="0.8"
+                            />
+
+                            {/* Position & Metric selector markers (Moves dynamically to match selected parameter: recess vs pocket) */}
+                            {(() => {
+                              const activeY = inputMetric === "pocket"
+                                ? (inputPosition === "mesial" ? yPocketM : inputPosition === "central" ? yPocketC : yPocketD)
+                                : (inputPosition === "mesial" ? yMarginM : inputPosition === "central" ? yMarginC : yMarginD);
+                              return (
+                                <g>
+                                  <circle 
+                                    cx={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
+                                    cy={activeY} 
+                                    r="6" 
+                                    fill={inputMetric === "pocket" ? "#ef4444" : "#06b6d4"} 
+                                    stroke="#ffffff" 
+                                    strokeWidth="1.5"
+                                    className="animate-ping"
+                                    style={{ transformOrigin: "center" }}
+                                  />
+                                  <circle 
+                                    cx={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
+                                    cy={activeY} 
+                                    r="4.5" 
+                                    fill={inputMetric === "pocket" ? "#b91c1c" : "#0891b2"} 
+                                    stroke="#ffffff" 
+                                    strokeWidth="1.5"
+                                  />
+                                </g>
+                              );
+                            })()}
+
+                            {/* Clickable Overlay Zones for Mesial, Central, Distal */}
+                            <g>
+                              {/* Left / Mesial Target */}
+                              <rect 
+                                x="10" 
+                                y="10" 
+                                width="28" 
+                                height="140" 
+                                fill="transparent" 
+                                className="cursor-pointer hover:fill-teal-500/5 transition-all"
+                                onClick={() => {
+                                  setInputPosition("mesial");
+                                }}
+                              />
+                              {/* Middle / Central Target */}
+                              <rect 
+                                x="38" 
+                                y="10" 
+                                width="24" 
+                                height="140" 
+                                fill="transparent" 
+                                className="cursor-pointer hover:fill-teal-500/5 transition-all"
+                                onClick={() => {
+                                  setInputPosition("central");
+                                }}
+                              />
+                              {/* Right / Distal Target */}
+                              <rect 
+                                x="62" 
+                                y="10" 
+                                width="28" 
+                                height="140" 
+                                fill="transparent" 
+                                className="cursor-pointer hover:fill-teal-500/5 transition-all"
+                                onClick={() => {
+                                  setInputPosition("distal");
+                                }}
+                              />
+                            </g>
                           </g>
                         );
                       })()}
@@ -816,7 +1001,7 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                   </div>
 
                   {/* Anatomical Explanation and Details Side Column */}
-                  <div className="flex-1 space-y-3">
+                  <div className="flex-1 space-y-3 w-full">
                     <div className="space-y-1">
                       <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
                         {inputSurface === "vestibular" ? "Vista Externa (Vestibular)" : "Vista Interna (Palatino/Lingual)"}
@@ -830,18 +1015,65 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                       </h4>
                     </div>
 
-                    <div className="space-y-2 text-xs leading-relaxed text-slate-600 dark:text-slate-350 bg-slate-50 dark:bg-slate-800/20 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                    {/* REAL-TIME DYNAMIC METRICS FOR SELECTED POSITION */}
+                    {(() => {
+                      if (toothIsMissing) return null;
+                      const pocketData = inputSurface === "vestibular" 
+                        ? (activeToothData.vestibularPocket || { mesial: 2, central: 1, distal: 2 }) 
+                        : (activeToothData.palatinoPocket || { mesial: 2, central: 1, distal: 2 });
+                      const recessData = inputSurface === "vestibular" 
+                        ? (activeToothData.vestibularRecess || { mesial: 0, central: 0, distal: 0 }) 
+                        : (activeToothData.palatinoRecess || { mesial: 0, central: 0, distal: 0 });
+
+                      const scale = 4.5;
+                      const currentPocketVal = pocketData[inputPosition] ?? 2;
+                      const currentRecessVal = recessData[inputPosition] ?? 0;
+                      const currentCalVal = currentPocketVal + currentRecessVal;
+
+                      return (
+                        <div className="p-3 bg-teal-500/5 dark:bg-teal-950/10 border border-teal-550/10 rounded-xl space-y-2 animate-fade-in">
+                          <div className="flex justify-between items-center text-[10px]">
+                            <span className="font-bold text-slate-500 dark:text-slate-400 uppercase">Valores Punto Seleccionado:</span>
+                            <span className="font-mono bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded font-black uppercase text-[9px] tracking-wider">
+                              Zona {inputPosition}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center font-mono">
+                            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 p-2 rounded-lg">
+                              <span className="text-[9px] text-slate-400 dark:text-slate-550 block font-sans font-medium uppercase">Sondaje</span>
+                              <span className={`text-sm font-black ${currentPocketVal >= 4 ? 'text-rose-500 animate-pulse' : 'text-slate-700 dark:text-slate-200'}`}>
+                                {currentPocketVal}mm
+                              </span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 p-2 rounded-lg">
+                              <span className="text-[9px] text-slate-400 dark:text-slate-550 block font-sans font-medium uppercase">Recesión</span>
+                              <span className="text-sm font-black text-cyan-550 dark:text-cyan-400">
+                                {currentRecessVal}mm
+                              </span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 p-2 rounded-lg">
+                              <span className="text-[9px] text-slate-400 dark:text-slate-550 block font-sans font-medium uppercase">NIC (CAL)</span>
+                              <span className={`text-sm font-black ${currentCalVal >= 5 ? 'text-rose-500' : 'text-teal-555 dark:text-teal-400'}`}>
+                                {currentCalVal}mm
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="space-y-2 text-[10.5px] leading-relaxed text-slate-600 dark:text-slate-350 bg-slate-50/60 dark:bg-slate-800/20 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-cyan-400 rounded-full inline-block" />
-                        <span className="font-semibold">Línea Margen Gingival (Azul)</span>: Determina la recesión.
+                        <span className="w-2 h-2 bg-cyan-400 rounded-full inline-block" />
+                        <span><span className="font-semibold text-slate-700 dark:text-slate-300">Margen Gingival (Celeste)</span>: Determina la recesión.</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-rose-500 rounded-full inline-block" />
-                        <span className="font-semibold">Fondo del Surco (Rojo)</span>: Profundidad del sondaje manual.
+                        <span className="w-2 h-2 bg-rose-500 rounded-full inline-block" />
+                        <span><span className="font-semibold text-slate-700 dark:text-slate-300">Fondo del Surco (Rojo)</span>: Profundidad del sondaje.</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-rose-500/20 rounded-sm inline-block border border-rose-400/20" />
-                        <span className="font-semibold">Zona Sombreada (Rojo claro)</span>: Pérdida real de inserción periodontal (CAL).
+                        <span className="w-2 h-2 bg-rose-500/20 rounded-xs inline-block border border-rose-400/20" />
+                        <span><span className="font-semibold text-slate-700 dark:text-slate-300">Zona Sombreada (Rojo claro)</span>: Pérdida de inserción (CAL).</span>
                       </div>
                     </div>
                   </div>

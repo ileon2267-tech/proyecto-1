@@ -468,7 +468,13 @@ export default function App() {
                     }}
                   />
                 ) : (
-                  <SoapAIAssistant patient={activePatient} />
+                  <SoapAIAssistant 
+                    patient={activePatient} 
+                    doctorName={doctorName}
+                    onUpdatePatient={(updatedPat) => {
+                      setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                    }}
+                  />
                 )}
               </div>
             ) : (
@@ -504,7 +510,7 @@ export default function App() {
           const filePatient = patients.find(p => p.id === selectedPatientFileId);
           if (filePatient) {
             return (
-              <div className="animate-fade-in z-10 relative h-[calc(100svh-140px)] md:h-[85vh] min-h-[500px]">
+              <div className="animate-fade-in z-10 relative w-full">
                 <PatientFile 
                   patient={filePatient} 
                   onUpdatePatient={(updated) => {
@@ -937,7 +943,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen font-sans ${darkMode ? "dark" : "bg-slate-50"} flex flex-col md:flex-row relative overflow-hidden`}>
+    <div className={`min-h-screen font-sans ${darkMode ? "dark" : "bg-slate-50"} flex flex-col md:flex-row relative`}>
       {/* Dynamic Cosmic Slate Background (Visible in Dark Mode) */}
       {darkMode && (
         <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden no-print">
@@ -947,7 +953,7 @@ export default function App() {
       )}
 
       {/* SIDEBAR ON DESKTOP - HIDDEN ON MOBILE */}
-      <aside className="w-64 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-100 dark:border-slate-800/50 flex flex-col py-6 sticky top-0 h-screen hidden md:flex shrink-0 no-print z-10 transition-colors">
+      <aside className="w-64 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-100 dark:border-slate-800/50 flex flex-col py-6 sticky top-0 h-screen hidden md:flex shrink-0 no-print z-10 transition-colors overflow-y-auto scrollbar-thin">
         
         {/* Brand Header */}
         <div className="px-5 pb-5 border-b border-slate-50 dark:border-slate-800 flex items-center gap-4">
@@ -1084,7 +1090,7 @@ export default function App() {
       </header>
 
       {/* VIEWPORT AREA CONTENT */}
-      <main className="flex-1 w-full overflow-y-auto p-4 md:p-8 space-y-6 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-8 relative z-0 print:p-0 print:m-0 print:overflow-visible">
+      <main className="flex-1 w-full p-4 md:p-8 space-y-6 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-8 relative z-0 print:p-0 print:m-0 print:overflow-visible">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

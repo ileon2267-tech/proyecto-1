@@ -30,6 +30,7 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
   const [months, setMonths] = useState(plan.financing?.months || 12);
   const [down, setDown] = useState(plan.financing?.downPayment || 0);
   const [rate, setRate] = useState(plan.financing?.interestRate || 15);
+  const [contractSuccess, setContractSuccess] = useState(false);
 
   const totalCost = plan.procedures.reduce((acc, p) => acc + p.cost, 0);
   const completedCost = plan.procedures.filter(p => p.completed).reduce((acc, p) => acc + p.cost, 0);
@@ -47,6 +48,31 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
 
   const handleUpdatePlan = (newPlan: TreatmentPlan) => {
     setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, treatmentPlan: newPlan } : p));
+  };
+
+  const handleApproveContract = () => {
+    const newEvolution = {
+      id: `evo-fin-${Date.now()}`,
+      date: new Date().toLocaleDateString("es-ES"),
+      description: `💳 CONTRATO DE FINANCIAMIENTO PLANIFICADO:\n\n- Costo Total Tratamientos: $${Math.round(totalCost).toLocaleString("es-CL")} CLP\n- Abono Enganche: $${Math.round(down).toLocaleString("es-CL")} CLP\n- Capital Financiado: $${Math.round(principal).toLocaleString("es-CL")} CLP\n- Plazo: ${months} meses con Tasa de ${rate}% interés anual.\n- Cuota Mensual Estimada: $${Math.round(installment).toLocaleString("es-CL")} CLP.`,
+      professional: "Administración / Finanzas",
+    };
+
+    const updatedEvolutions = [newEvolution, ...(activePatient.evolutions || [])];
+
+    setPatients(prev => prev.map(p => p.id === activePatient.id ? {
+      ...p,
+      evolutions: updatedEvolutions,
+      treatmentPlan: {
+        ...plan,
+        financing: { months, downPayment: down, interestRate: rate }
+      }
+    } : p));
+
+    setContractSuccess(true);
+    setTimeout(() => {
+      setContractSuccess(false);
+    }, 4000);
   };
 
   const handleAddProcedure = () => {
@@ -130,7 +156,7 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
            <h3 className="font-bold text-lg border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
               Procedimientos
               <span className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-700 dark:text-slate-300 font-mono">
-                ${completedCost.toLocaleString()} / ${totalCost.toLocaleString()} USD
+                ${completedCost.toLocaleString("es-CL")} / ${totalCost.toLocaleString("es-CL")} CLP
               </span>
            </h3>
 
@@ -150,7 +176,7 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
                 >
                   <option value="" disabled>-- Seleccione Arancel Preconfigurado --</option>
                   {Object.entries(aranceles).map(([name, price]) => (
-                    <option key={name} value={name}>{name} (${price.toLocaleString()})</option>
+                    <option key={name} value={name}>{name} (${price.toLocaleString("es-CL")} CLP)</option>
                   ))}
                 </select>
               </div>
@@ -184,9 +210,9 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
                              </button>
                              <span className={`text-sm ${proc.completed ? 'line-through opacity-70' : 'font-semibold'}`}>{proc.description}</span>
                            </div>
-                           <div className="flex items-center gap-4">
-                             <span className="font-mono text-sm">${proc.cost.toLocaleString()}</span>
-                             <button onClick={() => deleteProcedure(proc.id)} className="text-slate-300 hover:text-red-500 cursor-pointer transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           <div className="flex items-center gap-4 border-l border-slate-200 dark:border-slate-750 pl-3">
+                             <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">${proc.cost.toLocaleString("es-CL")} CLP</span>
+                             <button onClick={() => deleteProcedure(proc.id)} className="text-slate-305 hover:text-red-500 hover:scale-105 active:scale-95 duration-200 p-1 cursor-pointer transition-colors"><Trash2 className="w-4 h-4" /></button>
                            </div>
                         </div>
                       ))}
@@ -209,10 +235,10 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-slate-300">Pago Inicial (Enganche)</span>
-                  <span className="font-mono font-bold">${down.toLocaleString()}</span>
+                  <span className="font-mono font-bold">${down.toLocaleString("es-CL")} CLP</span>
                 </div>
                 <input 
-                  type="range" min="0" max={totalCost} step="50" value={down} 
+                  type="range" min="0" max={totalCost} step="5000" value={down} 
                   onChange={e => setDown(Number(e.target.value))} 
                   className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-500" 
                 />
@@ -247,15 +273,30 @@ export default function FinanceModule({ activePatient, setPatients, aranceles }:
           <div className="mt-8 bg-black/30 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
             <div className="flex justify-between items-center mb-2">
               <span className="text-slate-400 text-sm">Monto a Financiar</span>
-              <span className="font-mono text-lg">${principal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className="font-mono text-lg">${Math.round(principal).toLocaleString("es-CL")} CLP</span>
             </div>
             <div className="h-px w-full bg-white/10 my-3"/>
             <div className="flex justify-between items-end">
               <span className="text-teal-300 text-sm font-semibold">Cuota Mensual Estimada</span>
-              <span className="font-mono text-4xl font-black">${installment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className="font-mono text-4xl font-black">${Math.round(installment).toLocaleString("es-CL")} CLP</span>
             </div>
-            <button className="w-full mt-5 bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2">
-               <CreditCard className="w-5 h-5"/> Aprobar y Generar Contrato
+            {contractSuccess && (
+              <div className="text-[11px] font-bold text-center text-teal-300 bg-teal-900/40 p-2.5 rounded-xl border border-teal-500/20 mt-3 animate-pulse">
+                🎉 Contrato aprobado e inyectado con éxito en el Historial de Evoluciones Médicas.
+              </div>
+            )}
+            <button 
+              onClick={handleApproveContract}
+              disabled={contractSuccess || totalCost === 0}
+              className={`w-full mt-5 text-white font-bold py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                contractSuccess 
+                  ? "bg-teal-800/20 text-slate-400 border border-teal-500/10 cursor-not-allowed"
+                  : totalCost === 0
+                  ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50"
+                  : "bg-teal-600 hover:bg-teal-500 hover:scale-[1.01] active:scale-[0.99]"
+              }`}
+            >
+               <CreditCard className="w-5 h-5"/> {contractSuccess ? "Contrato Aprobado" : "Aprobar y Generar Contrato"}
             </button>
           </div>
         </div>

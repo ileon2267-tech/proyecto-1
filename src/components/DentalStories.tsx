@@ -1,8 +1,15 @@
-import React, { useState } from "react";
-import { MessageSquare, Share2, Coins, ArrowUpRight, Upload, Download, FileText, CheckCircle, Search, UserCheck, Heart, Sparkles, Filter, ChevronRight, DollarSign } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { MessageSquare, Share2, Coins, ArrowUpRight, Upload, Download, FileText, CheckCircle, Search, UserCheck, Heart, Sparkles, Filter, ChevronRight, DollarSign, Paperclip, Trash2, Image as ImageIcon, Sparkle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // Interfaces
+interface AttachedFile {
+  name: string;
+  size: string;
+  type: string;
+  dataUrl: string;
+}
+
 interface ForumPost {
   id: string;
   author: string;
@@ -13,6 +20,7 @@ interface ForumPost {
   commentsCount: number;
   createdAt: string;
   hasLiked?: boolean;
+  attachedFile?: AttachedFile | null;
 }
 
 interface SharedStudy {
@@ -25,17 +33,22 @@ interface SharedStudy {
   purchases: number;
   rating: number;
   isUnlocked?: boolean;
+  attachedFile?: AttachedFile | null;
 }
 
 export default function DentalStories() {
   const [activeTab, setActiveTab] = useState<"foro" | "estudios">("foro");
   
-  // Doctor Wallet State
-  const [earnings, setEarnings] = useState<number>(340.50);
+  // Custom refs for file inputs
+  const forumFileInputRef = useRef<HTMLInputElement>(null);
+  const studyFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Doctor Wallet State (using CLP values)
+  const [earnings, setEarnings] = useState<number>(340000);
   const [walletHistory, setWalletHistory] = useState([
-    { id: "w-1", desc: "Venta de Estudio: Regeneración Tisular Guiada", amount: 75.00, date: "2026-06-06" },
-    { id: "w-2", desc: "Venta de Guía: Diagnóstico de Crestas Alveolares", amount: 45.00, date: "2026-06-05" },
-    { id: "w-3", desc: "Venta de Estudio: Colgajo de Widman", amount: 29.99, date: "2026-06-04" },
+    { id: "w-1", desc: "Venta de Estudio: Regeneración Tisular Guiada", amount: 75000, date: "2026-06-06" },
+    { id: "w-2", desc: "Venta de Guía: Diagnóstico de Crestas Alveolares", amount: 45000, date: "2026-06-05" },
+    { id: "w-3", desc: "Venta de Estudio: Colgajo de Widman", amount: 30000, date: "2026-06-04" },
   ]);
 
   // Forum state
@@ -83,7 +96,7 @@ export default function DentalStories() {
       author: "Dr. Ignacio León",
       description: "Contiene 12 casos documentados paso a paso con radiografías CBCT pre y post operatorias, diseños de colgajo y manejo posquirúrgico.",
       fileSize: "18.4 MB (PDF/DICOM)",
-      price: 75.00,
+      price: 75000,
       purchases: 8,
       rating: 4.9,
       isUnlocked: true
@@ -94,7 +107,7 @@ export default function DentalStories() {
       author: "Dr. Ignacio León",
       description: "Estudio de clasificación y toma de decisiones quirúrgicas previas a la colocación de implantes periodontales utilizando guías 3D.",
       fileSize: "12.1 MB (PDF)",
-      price: 45.00,
+      price: 45000,
       purchases: 14,
       rating: 4.8,
       isUnlocked: false
@@ -105,7 +118,7 @@ export default function DentalStories() {
       author: "Dra. Andrea Valenzuela",
       description: "Análisis retrospectivo multivariable del clearance de bacterias anaerobias estrictas y cicatrización epitelial en bolsas críticas en sector anterior.",
       fileSize: "6.5 MB (PDF/MP4)",
-      price: 29.99,
+      price: 30000,
       purchases: 19,
       rating: 4.7,
       isUnlocked: false
@@ -116,11 +129,19 @@ export default function DentalStories() {
   const [newPostTitle, setNewPostTitle] = useState("");
   const [newPostCategory, setNewPostCategory] = useState("Casos Clínicos");
   const [newPostContent, setNewPostContent] = useState("");
+  
+  // Forum Attached File State
+  const [forumAttachedFile, setForumAttachedFile] = useState<AttachedFile | null>(null);
+  const [isForumDragging, setIsForumDragging] = useState(false);
 
   const [newStudyTitle, setNewStudyTitle] = useState("");
   const [newStudyDesc, setNewStudyDesc] = useState("");
   const [newStudyPrice, setNewStudyPrice] = useState("");
   const [newStudySize, setNewStudySize] = useState("4.8 MB (PDF)");
+  
+  // Study Attached File State
+  const [studyAttachedFile, setStudyAttachedFile] = useState<AttachedFile | null>(null);
+  const [isStudyDragging, setIsStudyDragging] = useState(false);
   
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -130,6 +151,46 @@ export default function DentalStories() {
   const [buyingStudyPrice, setBuyingStudyPrice] = useState<number>(0);
   const [buyingStudyTitle, setBuyingStudyTitle] = useState<string>("");
   const [unlockedSuccessText, setUnlockedSuccessText] = useState<string | null>(null);
+
+  // File Handlers
+  const handleForumFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processForumFile(file);
+  };
+
+  const processForumFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setForumAttachedFile({
+        name: file.name,
+        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        type: file.type,
+        dataUrl: event.target?.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleStudyFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processStudyFile(file);
+  };
+
+  const processStudyFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setStudyAttachedFile({
+        name: file.name,
+        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        type: file.type,
+        dataUrl: event.target?.result as string,
+      });
+      setNewStudySize(`${(file.size / (1024 * 1024)).toFixed(1)} MB (${file.type.split('/')[1]?.toUpperCase() || 'ZIP'})`);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Handlers
   const handleLikePost = (postId: string) => {
@@ -161,12 +222,14 @@ export default function DentalStories() {
       likes: 0,
       commentsCount: 0,
       createdAt: "Recién publicado",
-      hasLiked: false
+      hasLiked: false,
+      attachedFile: forumAttachedFile
     };
 
     setPosts([newPost, ...posts]);
     setNewPostTitle("");
     setNewPostContent("");
+    setForumAttachedFile(null);
   };
 
   const handleUploadStudy = (e: React.FormEvent) => {
@@ -182,11 +245,12 @@ export default function DentalStories() {
         title: newStudyTitle,
         author: "Tú (Dr. Ignacio León)",
         description: newStudyDesc,
-        fileSize: newStudySize,
+        fileSize: studyAttachedFile ? `${studyAttachedFile.size} (${studyAttachedFile.type.split('/')[1]?.toUpperCase() || 'ZIP'})` : newStudySize,
         price: priceNum,
         purchases: 0,
         rating: 5.0,
-        isUnlocked: true // uploaded studies are always unlocked for the author
+        isUnlocked: true, // uploaded studies are always unlocked for the author
+        attachedFile: studyAttachedFile
       };
 
       setStudies([newStudy, ...studies]);
@@ -200,6 +264,7 @@ export default function DentalStories() {
       setNewStudyTitle("");
       setNewStudyDesc("");
       setNewStudyPrice("");
+      setStudyAttachedFile(null);
     }, 1200);
   };
 
@@ -323,6 +388,70 @@ export default function DentalStories() {
                 required
               />
 
+              {/* Drag and Drop Upload Area for Forum */}
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setIsForumDragging(true); }}
+                onDragLeave={() => setIsForumDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsForumDragging(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) processForumFile(file);
+                }}
+                className={`p-4 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                  isForumDragging 
+                    ? "border-teal-500 bg-teal-550/10" 
+                    : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 hover:border-teal-500/40 hover:bg-slate-50 dark:hover:bg-slate-950/30"
+                }`}
+                onClick={() => forumFileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={forumFileInputRef}
+                  onChange={handleForumFileChange}
+                  accept="image/*,.pdf,.doc,.docx,.zip,.rar"
+                  className="hidden"
+                />
+                <Upload className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Arrastra un archivo aquí o haz clic para adjuntar foto o informe dental
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  Soporta imágenes (JPG, PNG) y documentos clínicos (PDF, DICOM ZIP) de hasta 10MB
+                </span>
+              </div>
+
+              {/* Show forum attachments if they exist */}
+              {forumAttachedFile && (
+                <div className="flex items-center justify-between p-3 bg-teal-500/5 dark:bg-teal-950/10 border border-teal-500/10 rounded-xl animate-fade-in">
+                  <div className="flex items-center gap-2.5 m-1 overflow-hidden truncate">
+                    {forumAttachedFile.type.startsWith("image/") ? (
+                      <div className="relative w-11 h-11 rounded-lg overflow-hidden border border-teal-500/20 shrink-0 bg-slate-100">
+                        <img src={forumAttachedFile.dataUrl} className="w-full h-full object-cover" alt="Attachment Preview" />
+                      </div>
+                    ) : (
+                      <div className="w-11 h-11 rounded-lg bg-teal-500/10 flex items-center justify-center border border-teal-500/20 shrink-0 text-teal-605">
+                        <FileText className="w-5.5 h-5.5" />
+                      </div>
+                    )}
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate max-w-[200px] md:max-w-xs">{forumAttachedFile.name}</p>
+                      <p className="text-[10px] font-mono font-semibold text-teal-600 dark:text-teal-400">{forumAttachedFile.size} • Listo para adjuntar</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForumAttachedFile(null);
+                      if (forumFileInputRef.current) forumFileInputRef.current.value = "";
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="flex justify-end pt-1">
                 <button
                   type="submit"
@@ -359,6 +488,49 @@ export default function DentalStories() {
                     <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed font-light">
                       {post.content}
                     </p>
+
+                    {/* Attached file output for the post */}
+                    {post.attachedFile && (
+                      <div className="mt-3.5 overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-950/15">
+                        {post.attachedFile.type.startsWith("image/") ? (
+                          <div className="relative group max-h-80 overflow-hidden bg-black/5 flex items-center justify-center">
+                            <img 
+                              src={post.attachedFile.dataUrl} 
+                              className="w-full max-h-80 object-contain hover:scale-[1.01] transition-transform duration-300" 
+                              alt={post.attachedFile.name} 
+                            />
+                            <a 
+                              href={post.attachedFile.dataUrl} 
+                              download={post.attachedFile.name}
+                              className="absolute top-2.5 right-2.5 bg-black/70 hover:bg-teal-600 text-white p-2 rounded-xl border border-white/10 backdrop-blur-md transition-all scale-95 opacity-80 group-hover:opacity-100 flex items-center gap-1.5 text-[10px] font-bold"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Guardar Foto
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="p-3 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2.5 truncate">
+                              <div className="p-2 bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-450 rounded-xl shrink-0">
+                                <FileText className="w-5 h-5" />
+                              </div>
+                              <div className="truncate">
+                                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{post.attachedFile.name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{post.attachedFile.size} • Adjunto Clínico</p>
+                              </div>
+                            </div>
+                            <a
+                              href={post.attachedFile.dataUrl}
+                              download={post.attachedFile.name}
+                              className="flex items-center gap-1 py-1.5 px-3 bg-teal-50 hover:bg-teal-100 dark:bg-teal-900/30 dark:hover:bg-teal-900/60 border border-teal-500/20 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase rounded-lg transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Bajar
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Likes and comments footer */}
@@ -450,14 +622,13 @@ export default function DentalStories() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block ml-0.5">Precio de Licencia (USD):</label>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block ml-0.5">Precio de Licencia (CLP):</label>
                     <input
                       type="number"
-                      placeholder="P. ej., 29.99"
+                      placeholder="P. ej., 45000"
                       value={newStudyPrice}
                       onChange={(e) => setNewStudyPrice(e.target.value)}
                       min="0"
-                      step="0.01"
                       className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl outline-none"
                       required
                     />
@@ -471,7 +642,7 @@ export default function DentalStories() {
                       className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl outline-none"
                     >
                       <option value="4.8 MB (PDF)">4.8 MB (PDF)</option>
-                      <option value="12.5 MB (PDF/DICOM)">12.5 MB (DICOM)</option>
+                      <option value="12.5 MB (DICOM)">12.5 MB (DICOM)</option>
                       <option value="22.1 MB (ZIP/CBCT)">22.1 MB (Radiografías/ZIP)</option>
                     </select>
                   </div>
@@ -487,6 +658,67 @@ export default function DentalStories() {
                     className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl outline-none"
                     required
                   />
+                </div>
+
+                {/* Drag and Drop Upload Area for Studies */}
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 block ml-0.5">Subir Fichero del Estudio Clínico (PDF, DICOM o ZIP):</label>
+                  <div 
+                    onDragOver={(e) => { e.preventDefault(); setIsStudyDragging(true); }}
+                    onDragLeave={() => setIsStudyDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsStudyDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) processStudyFile(file);
+                    }}
+                    className={`p-4 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                      isStudyDragging 
+                        ? "border-teal-500 bg-teal-550/10" 
+                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 hover:border-teal-500/40 hover:bg-slate-50 dark:hover:bg-slate-950/30"
+                    }`}
+                    onClick={() => studyFileInputRef.current?.click()}
+                  >
+                    <input
+                      type="file"
+                      ref={studyFileInputRef}
+                      onChange={handleStudyFileChange}
+                      accept=".pdf,.zip,.dicom,.rar,image/*"
+                      className="hidden"
+                    />
+                    <Upload className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Arrastra tu archivo aquí o haz clic para subir set de radiografías o PDF
+                    </span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                      Soporta PDF, ZIP (con sets DICOM), RAR o imágenes clínicas de hasta 25MB
+                    </span>
+                  </div>
+
+                  {/* Show study attachments preview if existing */}
+                  {studyAttachedFile && (
+                    <div className="flex items-center justify-between p-3 bg-teal-500/5 dark:bg-teal-950/10 border border-teal-500/10 rounded-xl animate-fade-in">
+                      <div className="flex items-center gap-2.5 overflow-hidden truncate">
+                        <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center border border-teal-500/20 text-teal-600 shrink-0">
+                          <FileText className="w-5.5 h-5.5" />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{studyAttachedFile.name}</p>
+                          <p className="text-[10px] font-mono text-teal-600 dark:text-teal-400">{studyAttachedFile.size} • Listo para empaquetar y monetizar</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStudyAttachedFile(null);
+                          if (studyFileInputRef.current) studyFileInputRef.current.value = "";
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all cursor-pointer shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -543,13 +775,32 @@ export default function DentalStories() {
                   {/* Actions column pricing */}
                   <div className="p-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100/50 dark:hover:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center gap-2 md:w-44 self-start md:self-center shrink-0">
                     <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Acceso Clínico</div>
-                    <div className="text-2xl font-display font-bold text-slate-800 dark:text-slate-100">${study.price.toFixed(2)} <span className="text-[11px] text-teal-600 font-bold">USD</span></div>
+                    <div className="text-2xl font-display font-bold text-slate-800 dark:text-slate-100">${Math.round(study.price).toLocaleString("es-CL")} <span className="text-[11px] text-teal-600 font-bold">CLP</span></div>
                     
                     {study.isUnlocked ? (
-                      <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg cursor-pointer transition-all inline-flex items-center justify-center gap-1">
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Descargar Archivos</span>
-                      </button>
+                      study.attachedFile ? (
+                        <a 
+                          href={study.attachedFile.dataUrl}
+                          download={study.attachedFile.name}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg cursor-pointer transition-all inline-flex items-center justify-center gap-1"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Descargar Original</span>
+                        </a>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            const link = document.createElement("a");
+                            link.href = "#";
+                            link.onclick = (e) => e.preventDefault();
+                            alert("Su descarga del estudio clínico/DICOM ha sido iniciada con éxito por PerioDash Secure Transfer.");
+                          }}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-lg cursor-pointer transition-all inline-flex items-center justify-center gap-1"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Descargar Demo</span>
+                        </button>
+                      )
                     ) : (
                       <button 
                         onClick={() => handleBuyStudy(study.id, study.price, study.title)}
@@ -574,7 +825,7 @@ export default function DentalStories() {
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 space-y-4 shadow-xs">
               <div className="flex justify-between items-center pb-2 border-b border-slate-50 dark:border-slate-800">
                 <span className="text-xs uppercase font-extrabold text-slate-400 tracking-wider inline-flex items-center gap-1.5">
-                  <Coins className="w-4.5 h-4.5 text-teal-600 animate-spin" />
+                  <Coins className="w-4.5 h-4.5 text-teal-650 animate-spin" />
                   <span>Billetera PerioPay Wallet</span>
                 </span>
                 <span className="text-[10px] bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded text-emerald-500 font-bold border border-slate-100 dark:border-slate-800">
@@ -584,11 +835,11 @@ export default function DentalStories() {
 
               <div className="space-y-1">
                 <span className="text-[10px] text-slate-400 font-bold block ml-0.5">FONDOS TOTALES ACUMULADOS POR ESTUDIOS:</span>
-                <h3 className="text-3xl font-display font-semibold text-teal-600 dark:text-teal-400 tracking-tight">${earnings.toFixed(2)} USD</h3>
+                <h3 className="text-3xl font-display font-semibold text-teal-600 dark:text-teal-400 tracking-tight">${Math.round(earnings).toLocaleString("es-CL")} CLP</h3>
               </div>
 
               <div className="p-3 bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 border border-emerald-500/10 rounded-xl text-[10px] leading-relaxed font-light">
-                Tus cobros acumulados son transferidos automáticamente a tu cuenta clíinica los días 25 de cada mes de forma recurrente.
+                Tus cobros acumulados son transferidos automáticamente a tu cuenta clínica los días 25 de cada mes de forma recurrente.
               </div>
 
               {/* Transactions log */}
@@ -602,7 +853,7 @@ export default function DentalStories() {
                         <span className="text-[10px] text-slate-400 font-normal block">{item.date}</span>
                       </div>
                       <span className={`font-mono font-bold shrink-0 ${item.amount < 0 ? "text-red-500" : "text-emerald-600"}`}>
-                        {item.amount < 0 ? "" : "+"}${item.amount.toFixed(2)} USD
+                        {item.amount < 0 ? "" : "+"}${Math.round(Math.abs(item.amount)).toLocaleString("es-CL")} CLP
                       </span>
                     </div>
                   ))}
@@ -639,7 +890,7 @@ export default function DentalStories() {
                 <div>
                   <h3 className="font-display font-black text-lg text-slate-900 dark:text-white">¿Licenciar Estudio Clínico?</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                    ¿Deseas desbloquear <strong className="text-slate-950 dark:text-teal-300 font-bold">"{buyingStudyTitle}"</strong> por <span className="font-mono font-bold text-teal-600 dark:text-teal-400">${buyingStudyPrice} USD</span> de tus fondos quirúrgicos de PerioSaaS?
+                    ¿Deseas desbloquear <strong className="text-slate-950 dark:text-teal-300 font-bold">"{buyingStudyTitle}"</strong> por <span className="font-mono font-bold text-teal-600 dark:text-teal-400">${buyingStudyPrice.toLocaleString("es-CL")} CLP</span> de tus fondos de PerioPay?
                   </p>
                 </div>
                 <div className="flex gap-2 pt-2">

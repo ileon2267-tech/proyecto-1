@@ -139,6 +139,31 @@ export default function KPIDashboard({
         </div>
       </motion.div>
 
+      {/* Smart Clinic Insights Banner */}
+      <motion.div
+        variants={itemVariants}
+        className="bg-teal-500/5 dark:bg-teal-400/5 border border-teal-550/15 dark:border-teal-500/10 rounded-[1.5rem] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 shrink-0 shadow-inner">
+            <Sparkles className="w-4 h-4 animate-pulse text-teal-600 dark:text-teal-350" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400">Recomendación Epidemiológica de Dentito AI</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+              El {bopPercentage > 20 ? "índice de sangrado (BOP) consolidado es elevado" : "gabinete registra un índice de sangrado periodontal ideal"}. Se sugiere priorizar {bopPercentage > 20 ? "tratamientos de Raspado y Alisado Radicular (RAR) en pacientes con bolsas ≥ 4mm" : "mantenimientos periodontales semestrales periódicos"} para asegurar la estabilidad óseo-periodontal.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onNavigateTo("clinica")}
+          className="text-xs font-bold text-teal-600 dark:text-teal-450 hover:underline inline-flex items-center gap-1 shrink-0 px-3 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors cursor-pointer"
+        >
+          <span>Auditar clínica</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </motion.div>
+
       {/* Bento Grid Stats */}
       <motion.div 
         variants={containerVariants} 
