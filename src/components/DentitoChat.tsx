@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Patient, ChatMessage } from "../types";
-import { Send, Maximize2, Minimize2, Mic, AlertTriangle, Activity, HeartPulse, BrainCircuit, Search, Info, Move } from "lucide-react";
+import { Send, Maximize2, Minimize2, Mic, AlertTriangle, Activity, HeartPulse, BrainCircuit, Search, Info, Move, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Markdown from "react-markdown";
 
@@ -320,7 +320,15 @@ export default function DentitoChat({ activePatient }: DentitoChatProps) {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Tu navegador Safari/viejo no soporta Web Speech API. Usa Chrome/Edge.");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `bot-speech-err-${Date.now()}`,
+          role: "assistant",
+          content: "🤖 **Asistente Dentito**: He detectado que tu navegador actual no ofrece soporte para la API de dictados y control por voz (Web Speech API). Te recomiendo utilizar Google Chrome o Microsoft Edge para activar esta función de comandos clínicos sin manos.",
+          createdAt: new Date().toISOString(),
+        }
+      ]);
       return;
     }
 
@@ -366,21 +374,26 @@ export default function DentitoChat({ activePatient }: DentitoChatProps) {
               </div>
 
               {emergencyMode === "selector" && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <button onClick={() => setEmergencyMode("syncope")} className="bg-black/20 hover:bg-black/40 p-6 md:p-8 rounded-3xl flex flex-col items-center text-center gap-4 transition-all cursor-pointer border border-white/5 hover:border-white/20 group">
-                    <Activity className="w-10 h-10 text-cyan-400 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-bold text-lg md:text-xl">Síncope Vasovagal</h3>
-                    <p className="text-[11px] md:text-xs text-rose-200/70">Hiperventilación, pérdida de consciencia súbita, palidez extrema.</p>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <button onClick={() => setEmergencyMode("syncope")} className="bg-black/20 hover:bg-black/40 p-5 rounded-3xl flex flex-col items-center text-center gap-3 transition-all cursor-pointer border border-white/5 hover:border-white/20 group">
+                    <Activity className="w-8 h-8 text-cyan-400 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-base">Síncope Vasovagal</h3>
+                    <p className="text-[10.5px] text-rose-200/70">Pérdida de consciencia súbita, palidez extrema, bradicardia transitoria.</p>
                   </button>
-                  <button onClick={() => setEmergencyMode("anaphylaxis")} className="bg-rose-500/10 hover:bg-rose-500/20 p-6 md:p-8 rounded-3xl flex flex-col items-center text-center gap-4 transition-all cursor-pointer border border-rose-500/30 hover:border-rose-500/60 shadow-[0_0_30px_rgba(244,63,94,0.1)] group">
-                    <AlertTriangle className="w-10 h-10 text-yellow-400 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-bold text-lg md:text-xl">Shock Anafiláctico</h3>
-                    <p className="text-[11px] md:text-xs text-rose-200/70">Reacción alérgica aguda severa, taquicardia, broncoespasmo severo.</p>
+                  <button onClick={() => setEmergencyMode("anaphylaxis")} className="bg-rose-500/10 hover:bg-rose-500/20 p-5 rounded-3xl flex flex-col items-center text-center gap-3 transition-all cursor-pointer border border-rose-500/30 hover:border-rose-500/60 shadow-[0_0_30px_rgba(244,63,94,0.1)] group">
+                    <AlertTriangle className="w-8 h-8 text-yellow-400 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-base">Shock Anafiláctico</h3>
+                    <p className="text-[10.5px] text-rose-200/70">Reacción alérgica aguda, broncoespasmo severo, erupción cutánea.</p>
                   </button>
-                  <button onClick={() => setEmergencyMode("angina")} className="bg-black/20 hover:bg-black/40 p-6 md:p-8 rounded-3xl flex flex-col items-center text-center gap-4 transition-all cursor-pointer border border-white/5 hover:border-white/20 group">
-                    <HeartPulse className="w-10 h-10 text-rose-400 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-bold text-lg md:text-xl">Angina o IAM</h3>
-                    <p className="text-[11px] md:text-xs text-rose-200/70">Dolor torácico opresivo, irradiado a mandíbula o brazo izquierdo.</p>
+                  <button onClick={() => setEmergencyMode("angina")} className="bg-black/20 hover:bg-black/40 p-5 rounded-3xl flex flex-col items-center text-center gap-3 transition-all cursor-pointer border border-white/5 hover:border-white/20 group">
+                    <HeartPulse className="w-8 h-8 text-rose-400 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-base">Angina o IAM</h3>
+                    <p className="text-[10.5px] text-rose-200/70">Dolor torácico opresivo, irradiado a cuello, mandíbula o brazo izq.</p>
+                  </button>
+                  <button onClick={() => setEmergencyMode("hypoglycemia")} className="bg-emerald-550/10 hover:bg-emerald-500/20 p-5 rounded-3xl flex flex-col items-center text-center gap-3 transition-all cursor-pointer border border-emerald-500/20 hover:border-emerald-500/50 group">
+                    <ShieldAlert className="w-8 h-8 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-bold text-base">Crisis Hipoglicémica</h3>
+                    <p className="text-[10.5px] text-rose-200/70">Sudoración fría, confusión metabólica, temblores en paciente ayunado.</p>
                   </button>
                 </div>
               )}
@@ -388,8 +401,8 @@ export default function DentitoChat({ activePatient }: DentitoChatProps) {
               {/* Protocol Details remain similar but styling enhanced */}
               {emergencyMode === "syncope" && (
                 <div className="space-y-6">
-                  <h3 className="text-3xl font-display font-black flex items-center gap-3"><Activity className="w-8 h-8 text-cyan-400"/> Síncope Vasovagal</h3>
-                  <div className="space-y-4 font-mono text-base bg-black/40 backdrop-blur-md p-8 rounded-3xl border border-white/10 text-emerald-50">
+                  <h3 className="text-2xl md:text-3xl font-display font-black flex items-center gap-3"><Activity className="w-8 h-8 text-cyan-400"/> Síncope Vasovagal</h3>
+                  <div className="space-y-4 font-mono text-sm md:text-base bg-black/40 backdrop-blur-md p-6 md:p-8 rounded-3xl border border-white/10 text-emerald-50">
                     <p className="text-rose-400 font-bold mb-4">1. 🛑 DETENER EL TRATAMIENTO INMEDIATAMENTE.</p>
                     <p>2. 💺 Posición de Trendelenburg (Inclinación del sillón dental con piernas elevadas a 15-30°).</p>
                     <p>3. 💨 Aflojar prendas muy ajustadas (cuellos, corbatas, cinturones).</p>
@@ -401,9 +414,9 @@ export default function DentitoChat({ activePatient }: DentitoChatProps) {
               )}
               {emergencyMode === "anaphylaxis" && (
                 <div className="space-y-6">
-                  <h3 className="text-3xl font-display font-black flex items-center gap-3 text-yellow-400"><AlertTriangle className="w-8 h-8"/> Shock Anafiláctico</h3>
-                  <div className="space-y-4 font-mono text-base bg-rose-950/60 backdrop-blur-md p-8 rounded-3xl border border-rose-500/30 text-rose-100 shadow-inner">
-                    <p className="font-bold text-yellow-300 text-lg mb-2">1. 📞 ACTIVAR SISTEMA DE EMERGENCIAS (LLAMAR A UNA AMBULANCIA AHORA).</p>
+                  <h3 className="text-2xl md:text-3xl font-display font-black flex items-center gap-3 text-yellow-400"><AlertTriangle className="w-8 h-8"/> Shock Anafiláctico</h3>
+                  <div className="space-y-4 font-mono text-sm md:text-base bg-rose-950/60 backdrop-blur-md p-6 md:p-8 rounded-3xl border border-rose-500/30 text-rose-100 shadow-inner">
+                    <p className="font-bold text-yellow-300 text-base md:text-lg mb-2">1. 📞 ACTIVAR SISTEMA DE EMERGENCIAS (LLAMAR A UNA AMBULANCIA AHORA).</p>
                     <p>2. 🛑 Cancelar procedimiento y retirar todos los materiales dentales/alérgenos de la boca.</p>
                     <p className="font-bold text-white bg-rose-600/30 p-3 rounded-lg border border-rose-500/50">3. 💉 ADRENALINA IM inyectable (Adultos: 0.3 a 0.5 mg, dilución 1:1000) en la cara anterolateral del muslo (vasto externo) INMEDIATAMENTE.</p>
                     <p>4. 💺 Posición supina y elevación pasiva de piernas (si tolera y no hay compromiso respiratorio severo).</p>
@@ -412,15 +425,28 @@ export default function DentitoChat({ activePatient }: DentitoChatProps) {
                   <button onClick={() => setEmergencyMode("selector")} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full cursor-pointer font-bold text-sm transition-all border border-white/20">← Cambiar Condición</button>
                 </div>
               )}
-               {emergencyMode === "angina" && (
+              {emergencyMode === "angina" && (
                 <div className="space-y-6">
-                  <h3 className="text-3xl font-display font-black flex items-center gap-3 text-rose-300"><HeartPulse className="w-8 h-8"/> Síndrome Coronario (IAM/Angina)</h3>
-                  <div className="space-y-4 font-mono text-base bg-black/40 backdrop-blur-md p-8 rounded-3xl border border-white/10 text-emerald-50">
+                  <h3 className="text-2xl md:text-3xl font-display font-black flex items-center gap-3 text-rose-300"><HeartPulse className="w-8 h-8"/> Síndrome Coronario (IAM/Angina)</h3>
+                  <div className="space-y-4 font-mono text-sm md:text-base bg-black/40 backdrop-blur-md p-6 md:p-8 rounded-3xl border border-white/10 text-emerald-50">
                     <p className="text-rose-400 font-bold mb-4">1. 🛑 DETENER EL TRATAMIENTO INMEDIATAMENTE.</p>
                     <p className="font-bold text-yellow-300">2. 📞 LLAMAR al servicio de emergencias si sospechas Infarto (el dolor no cede en minutos).</p>
                     <p>3. 💺 Posicionar al paciente semisentado para facilitar la ventilación.</p>
                     <p>4. 🌬️ Administrar Oxígeno suplementario de inmediato.</p>
                     <p className="font-bold">5. 💊 Fármacos (SOLO si el paciente no tiene contraindicaciones y sospechas fuertemente): Nitroglicerina sublingual o Aspirina masticable 300mg.</p>
+                  </div>
+                  <button onClick={() => setEmergencyMode("selector")} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full cursor-pointer font-bold text-sm transition-all border border-white/20">← Cambiar Condición</button>
+                </div>
+              )}
+              {emergencyMode === "hypoglycemia" && (
+                <div className="space-y-6">
+                  <h3 className="text-2xl md:text-3xl font-display font-black flex items-center gap-3 text-emerald-400"><ShieldAlert className="w-8 h-8"/> Crisis Hipoglicémica</h3>
+                  <div className="space-y-4 font-mono text-sm md:text-base bg-emerald-950/40 backdrop-blur-md p-6 md:p-8 rounded-3xl border border-emerald-500/20 text-emerald-100">
+                    <p className="text-rose-300 font-bold mb-4">1. 🛑 EVALUAR ESTADO DE CONSCIENCIA.</p>
+                    <p>2. 🍬 <strong>Si el paciente está consciente</strong>: Suministrar carbohidratos de absorción rápida vía oral (jugo de fruta azucarado, tabletas de glucosa o agua con 2 cucharadas de azúcar).</p>
+                    <p className="font-bold text-yellow-300">3. 🛑 Si el paciente pierde el conocimiento / inconsciente: NUNCA administrar nada por vía oral (riesgo de aspiración bronquial).</p>
+                    <p>4. 💉 Administrar Glucagón 1mg intramuscular, canalizar vía endovenosa con Dextrosa al 10% o 50% y llamar al servicio de urgencias de inmediato.</p>
+                    <p>5. ⏱️ Monitorear niveles de glicemia capilar cada 10 minutos hasta estabilizar ≥ 90 mg/dL.</p>
                   </div>
                   <button onClick={() => setEmergencyMode("selector")} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full cursor-pointer font-bold text-sm transition-all border border-white/20">← Cambiar Condición</button>
                 </div>

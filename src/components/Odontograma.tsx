@@ -14,6 +14,7 @@ type SelectedTool = "caries" | "obturado" | "sano";
 export default function Odontograma({ odontogram, onChange }: OdontogramaProps) {
   const [activeTool, setActiveTool] = useState<SelectedTool>("caries");
   const [selectedTooth, setSelectedTooth] = useState<number | null>(11);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleSurfaceClick = (toothNum: number, surface: keyof ToothState["surfaces"]) => {
     const updated = { ...odontogram };
@@ -47,24 +48,27 @@ export default function Odontograma({ odontogram, onChange }: OdontogramaProps) 
   };
 
   const resetAllOdontogram = () => {
-    if (confirm("¿Estás seguro de que deseas restablecer el odontograma clínico de este paciente?")) {
-      const reset = { ...odontogram };
-      Object.keys(reset).forEach((key) => {
-        const num = Number(key);
-        reset[num] = {
-          toothNumber: num,
-          surfaces: {
-            vestibular: "sano",
-            occlusal: "sano",
-            lingual: "sano",
-            mesial: "sano",
-            distal: "sano",
-          },
-          condition: "sano",
-        };
-      });
-      onChange(reset);
-    }
+    setShowResetConfirm(true);
+  };
+
+  const executeResetAllOdontogram = () => {
+    const reset = { ...odontogram };
+    Object.keys(reset).forEach((key) => {
+      const num = Number(key);
+      reset[num] = {
+        toothNumber: num,
+        surfaces: {
+          vestibular: "sano",
+          occlusal: "sano",
+          lingual: "sano",
+          mesial: "sano",
+          distal: "sano",
+        },
+        condition: "sano",
+      };
+    });
+    onChange(reset);
+    setShowResetConfirm(false);
   };
 
   // Modern, clinical pastel-toned medical palette
@@ -401,6 +405,50 @@ export default function Odontograma({ odontogram, onChange }: OdontogramaProps) 
         </div>
       </div>
 
+      {/* Custom Reset Confirmation Modal overlay */}
+      <AnimatePresence>
+        {showResetConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[200] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative"
+            >
+              <div className="space-y-4">
+                <div className="w-12 h-12 bg-red-500/10 text-red-650 dark:text-red-400 rounded-2xl flex items-center justify-center border border-red-500/10">
+                  <RefreshCw className="w-5 h-5 text-red-500 animate-spin" />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-base text-slate-900 dark:text-white">¿Restablecer Odontograma?</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                    Esta acción revertirá todas las superficies, obturaciones y caries registradas en este paciente de forma irreversible.
+                  </p>
+                </div>
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    onClick={executeResetAllOdontogram}
+                    className="flex-1 bg-red-650 hover:bg-red-750 text-white font-extrabold text-xs py-3 rounded-xl transition-all cursor-pointer active:scale-95 text-center"
+                  >
+                    Sí, Restablecer
+                  </button>
+                  <button
+                    onClick={() => setShowResetConfirm(false)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700/60 active:scale-95 text-center"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

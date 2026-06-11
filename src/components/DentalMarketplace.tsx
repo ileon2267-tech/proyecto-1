@@ -18,7 +18,9 @@ import {
   ShieldCheck,
   ChevronDown,
   X,
-  Plus
+  Plus,
+  Image as ImageIcon,
+  UploadCloud
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -36,6 +38,7 @@ export interface DentalListing {
   description: string;
   createdAt: string;
   isMine?: boolean;
+  imageUrl?: string;
 }
 
 const DEFAULT_LISTINGS: DentalListing[] = [
@@ -51,7 +54,8 @@ const DEFAULT_LISTINGS: DentalListing[] = [
     sellerPhone: "+56 9 7788 9911",
     location: "Santiago Centro, Metropolitana",
     description: "Turbina con cabezal estándar, rodamiento de cerámica y acople de 4 vías. Totalmente nueva en caja sellada por error en importación. Garantía de fábrica vigente (6 meses).",
-    createdAt: "Hace 1 día"
+    createdAt: "Hace 1 día",
+    imageUrl: "https://images.unsplash.com/photo-1579684389782-64d84b5e901d?q=80&w=400&auto=format&fit=crop"
   },
   {
     id: "lst-2",
@@ -66,7 +70,8 @@ const DEFAULT_LISTINGS: DentalListing[] = [
     location: "Providencia, Metropolitana",
     description: "Kit completo de curetas Gracey EverEdge 2.0. Un solo uso académico, perfectamente afiladas y esterilizadas químicamente. En caja organizadora original Hu-Friedy.",
     createdAt: "Hace 2 días",
-    isMine: true
+    isMine: true,
+    imageUrl: "https://images.unsplash.com/photo-1598256989800-fe5f95da9787?q=80&w=400&auto=format&fit=crop"
   },
   {
     id: "lst-3",
@@ -80,7 +85,8 @@ const DEFAULT_LISTINGS: DentalListing[] = [
     sellerPhone: "+56 9 9544 3322",
     location: "Concepción, Biobío",
     description: "Lámpara inalámbrica de fotocurado de alta gama con carcasa de acero inoxidable. Excelente distribución de luz para polimerizaciones homogéneas. 2 años de uso clínico moderado.",
-    createdAt: "Hace 4 días"
+    createdAt: "Hace 4 días",
+    imageUrl: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=400&auto=format&fit=crop"
   },
   {
     id: "lst-4",
@@ -94,7 +100,8 @@ const DEFAULT_LISTINGS: DentalListing[] = [
     sellerPhone: "+56 9 8833 4455",
     location: "Viña del Mar, Valparaíso",
     description: "Tonos A1, A2, A3, B2 y Opaco. Vencimiento prolongado para marzo de 2028. Sellados de fábrica. Vendo por cambio de marca preferencial.",
-    createdAt: "Hace 5 días"
+    createdAt: "Hace 5 días",
+    imageUrl: "https://images.unsplash.com/photo-1512223792601-592a9809eed4?q=80&w=400&auto=format&fit=crop"
   },
   {
     id: "lst-5",
@@ -108,7 +115,8 @@ const DEFAULT_LISTINGS: DentalListing[] = [
     sellerPhone: "+56 9 7654 3210",
     location: "Las Condes, Metropolitana",
     description: "Modelo de quinta generación, pantalla LCD brillante y alertas por sonido. Gran precisión clínica en endodoncias complejas. Incluye todos los clips labiales y accesorios originales.",
-    createdAt: "Hace 1 semana"
+    createdAt: "Hace 1 semana",
+    imageUrl: "https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?q=80&w=400&auto=format&fit=crop"
   },
   {
     id: "lst-6",
@@ -122,7 +130,8 @@ const DEFAULT_LISTINGS: DentalListing[] = [
     sellerPhone: "+56 9 9988 7766",
     location: "Antofagasta",
     description: "Fórceps para molar superior, molar inferior, premolares y restos radiculares. Acero de grado quirúrgico médico alemán, esterilizable en autoclave. Tienen marcas mínimas de uso estético pero 100% funcionales.",
-    createdAt: "Hace 1 semana"
+    createdAt: "Hace 1 semana",
+    imageUrl: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=400&auto=format&fit=crop"
   }
 ];
 
@@ -163,6 +172,85 @@ export default function DentalMarketplace() {
   const [newSellerPhone, setNewSellerPhone] = useState("+56 9 ");
   const [newLocation, setNewLocation] = useState("Santiago, Metropolitana");
   const [newDescription, setNewDescription] = useState("");
+  
+  // Image Upload and Drag-n-Drop States
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Drag and drop handler mechanics
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const processFile = (file: File) => {
+    setImageError("");
+    if (!file.type.startsWith("image/")) {
+      setImageError("Por favor, sube solo archivos de imagen (PNG, JPG, WEBP).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const img = new Image();
+        img.src = event.target.result as string;
+        img.onload = () => {
+          // Downscale to max 500px width/height for web performance & localStorage quota safety
+          const maxDim = 500;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Compress with jpeg format to save tons of space
+            const compressed = canvas.toDataURL("image/jpeg", 0.75);
+            setNewImageUrl(compressed);
+          } else {
+            setNewImageUrl(event.target.result as string);
+          }
+        };
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      processFile(e.target.files[0]);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem("perioDentalListings", JSON.stringify(listings));
@@ -199,6 +287,7 @@ export default function DentalMarketplace() {
       sellerPhone: newSellerPhone,
       location: newLocation,
       description: newDescription,
+      imageUrl: newImageUrl || undefined,
       createdAt: "Recién publicado",
       isMine: true
     };
@@ -210,6 +299,7 @@ export default function DentalMarketplace() {
     setNewTitle("");
     setNewPrice("");
     setNewDescription("");
+    setNewImageUrl("");
     
     // Show toast notification
     setShowSuccessToast(true);
@@ -218,10 +308,7 @@ export default function DentalMarketplace() {
 
   const handleDeleteListing = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm("¿Estás seguro de que deseas eliminar permanentemente esta publicación?")) {
-      setListings(listings.filter(l => l.id !== id));
-      if (activeContactItem?.id === id) setActiveContactItem(null);
-    }
+    setDeletingId(id);
   };
 
   const handleOpenContact = (item: DentalListing) => {
@@ -287,16 +374,22 @@ export default function DentalMarketplace() {
       </AnimatePresence>
 
       {/* Header Banner Section */}
-      <div className="bg-white dark:bg-slate-900 duration-200 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm relative overflow-hidden bg-gradient-to-r from-transparent via-teal-50/10 to-teal-50/20 dark:via-teal-950/5 dark:to-teal-900/10">
-        <div className="space-y-1 z-10">
+      <div className="bg-white dark:bg-slate-900 duration-200 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-6 lg:p-7 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm relative overflow-hidden bg-gradient-to-r from-transparent via-teal-50/10 to-teal-50/20 dark:via-teal-950/5 dark:to-teal-900/10 neon-box-pulse">
+        {/* Sleek top neon line */}
+        <div className="absolute top-0 left-0 right-0 h-[3px] neon-rainbow-bg opacity-100 neon-intense-glow" />
+        <div className="space-y-1 z-10 w-full md:max-w-2xl">
           <div className="flex items-center gap-2">
-            <span className="p-1 px-2.5 bg-teal-500/10 text-teal-600 dark:text-teal-400 font-extrabold text-[9px] rounded-full uppercase tracking-wider border border-teal-500/20">
+            <span className="p-1 px-2.5 bg-gradient-to-r from-teal-500/10 to-indigo-500/10 text-teal-600 dark:text-teal-400 font-extrabold text-[9px] rounded-full uppercase tracking-wider border border-teal-500/25 flex items-center gap-1.5 shadow-[0_0_8px_rgba(20,184,166,0.15)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping" />
               Gremio & Colegas PerioDash
             </span>
           </div>
-          <h2 className="text-xl font-display font-black text-slate-800 dark:text-white flex items-center gap-2 mt-1">
-            <ShoppingBag className="w-5.5 h-5.5 text-teal-600 dark:text-teal-400" />
-            <span>Mercado Dental Colaborativo</span>
+          <h2 className="text-xl font-display font-black text-slate-800 dark:text-white flex items-center gap-3 mt-1.5">
+            <div className="relative p-2 bg-teal-50 dark:bg-slate-800/80 rounded-xl overflow-hidden shrink-0 flex items-center justify-center border border-teal-100 dark:border-slate-700 neon-intense-glow shadow-[0_0_12px_rgba(0,255,204,0.3)]">
+               <div className="absolute inset-0 neon-rainbow-bg opacity-50 blur-xs" />
+               <ShoppingBag className="w-5 h-5 text-teal-600 dark:text-teal-400 relative z-10" />
+            </div>
+            <span className="neon-text-rainbow font-black tracking-tight">Mercado Dental Colaborativo</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl font-normal leading-relaxed">
             Compra y vende instrumental médico, piezas de mano, autoclaves o excedente de insumos garantizados de colega a colega. Optimiza costos con materiales nuevos o de segunda mano en perfecto estado de esterilización.
@@ -305,10 +398,13 @@ export default function DentalMarketplace() {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-all shadow-md active:scale-98 flex items-center gap-2 self-stretch md:self-center shrink-0"
+          className="relative group p-[1.5px] rounded-xl overflow-hidden cursor-pointer active:scale-98 transition-transform self-stretch md:self-center shrink-0 shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_25px_rgba(20,184,166,0.5)] duration-300"
         >
-          <Plus className="w-4 h-4" />
-          <span>Vender mi Material</span>
+          <div className="absolute inset-0 neon-rainbow-bg group-hover:scale-105 duration-300 pointer-events-none" />
+          <div className="relative bg-slate-900 text-white font-bold text-xs py-2.5 px-4 rounded-[11px] flex items-center justify-center gap-2">
+            <Plus className="w-4 h-4 text-emerald-400" />
+            <span>Vender mi Material</span>
+          </div>
         </button>
       </div>
 
@@ -316,22 +412,24 @@ export default function DentalMarketplace() {
       <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 flex-shrink-0 w-full overflow-x-auto select-none">
         <button
           onClick={() => setActiveSubTab("explorer")}
-          className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
+          className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer relative ${
             activeSubTab === "explorer"
-              ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
+              ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.15)] scale-[1.01]"
               : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
           }`}
         >
+          {activeSubTab === "explorer" && <div className="absolute top-0 inset-x-4 h-[1.5px] neon-rainbow-bg rounded-full opacity-80" />}
           Explorar Productos ({listings.length})
         </button>
         <button
           onClick={() => setActiveSubTab("mine")}
-          className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
+          className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer relative ${
             activeSubTab === "mine"
-              ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
+              ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.15)] scale-[1.01]"
               : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
           }`}
         >
+          {activeSubTab === "mine" && <div className="absolute top-0 inset-x-4 h-[1.5px] neon-rainbow-bg rounded-full opacity-80" />}
           Mis Publicaciones ({listings.filter(l => l.isMine).length})
         </button>
       </div>
@@ -406,54 +504,114 @@ export default function DentalMarketplace() {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               key={item.id}
-              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 flex flex-col justify-between hover:border-teal-500/30 dark:hover:border-teal-500/30 hover:shadow-lg dark:hover:shadow-teal-950/20 transition-all duration-300 relative group overflow-hidden"
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 flex flex-col justify-between hover:border-teal-500/35 dark:hover:border-teal-500/35 hover:shadow-[0_0_20px_rgba(13,148,136,0.14)] dark:hover:shadow-[0_0_20px_rgba(20,184,166,0.08)] transition-all duration-300 relative group overflow-hidden"
             >
               {/* Product Background Accents */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-teal-500/5 to-transparent rounded-bl-full pointer-events-none group-hover:scale-105 duration-300" />
+              {/* Soft neon rainbow top bar on hover */}
+              <div className="absolute top-0 left-0 right-0 h-[2.5px] neon-rainbow-bg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none" />
+
+              {/* Custom Inline Delete Confirmation Overlay with glassmorphism */}
+              <AnimatePresence>
+                {deletingId === item.id && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-4 text-center space-y-3.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="w-8 h-8 text-rose-500 animate-bounce" />
+                    <div>
+                      <p className="text-white text-xs font-black uppercase tracking-wider">¿Confirmar Eliminación?</p>
+                      <p className="text-[10px] text-slate-400 mt-1 max-w-[190px] mx-auto leading-normal">Esta acción eliminará de forma irreversible tu publicación.</p>
+                    </div>
+                    <div className="flex gap-2 w-full max-w-[180px]">
+                      <button
+                        onClick={() => {
+                          setListings((prev) => prev.filter((l) => l.id !== item.id));
+                          if (activeContactItem?.id === item.id) setActiveContactItem(null);
+                          setDeletingId(null);
+                        }}
+                        className="flex-1 bg-rose-500 hover:bg-rose-650 text-white font-extrabold text-[10.5px] py-2 rounded-xl cursor-pointer shadow-md active:scale-95 transition-all text-center"
+                      >
+                        Sí, eliminar
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(null)}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10.5px] py-2 rounded-xl cursor-pointer border border-slate-700/60 active:scale-95 transition-all text-center"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               
-              <div className="space-y-4">
-                {/* Visual Badges Row */}
-                <div className="flex justify-between items-center select-none">
-                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+              <div>
+                {/* Product Image Area */}
+                <div className="relative h-44 -mx-5 -mt-5 mb-4 bg-slate-50 dark:bg-slate-950 overflow-hidden border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-center">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-teal-500/5 to-indigo-500/5 text-teal-600 dark:text-teal-400">
+                      <ShoppingBag className="w-10 h-10 opacity-30 group-hover:scale-110 transition-transform duration-300" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest mt-2 opacity-50">Sin Foto</span>
+                    </div>
+                  )}
+                  {/* Visual Condition BadgeOverlay */}
+                  <span className={`absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-md select-none ${
                     item.condition === "Nuevo" 
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                       : item.condition.includes("Como nuevo")
-                      ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
-                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                      ? "bg-teal-500/15 text-teal-650 dark:text-teal-450 border-teal-500/30"
+                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
                   }`}>
                     {item.condition}
                   </span>
-
-                  <span className="text-[10px] font-medium text-slate-400 font-mono inline-flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {item.createdAt}
-                  </span>
                 </div>
 
-                {/* Main title and Category */}
-                <div className="space-y-1">
-                  <div className="text-[9px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">{item.category}</div>
-                  <h3 className="font-display font-extrabold text-sm text-slate-800 dark:text-slate-100 leading-snug group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors duration-150 line-clamp-1">
-                    {item.title}
-                  </h3>
-                </div>
-
-                {/* Description snippet */}
-                <p className="text-[11px] text-slate-400 dark:text-slate-400 font-normal leading-relaxed line-clamp-3">
-                  {item.description}
-                </p>
-
-                {/* Seller and Location summary */}
-                <div className="pt-3 border-t border-slate-50 dark:border-slate-800/80 space-y-1.5 text-[11px]">
-                  <div className="flex items-center gap-2 text-slate-500 dark:text-slate-350">
-                    <div className="w-4 h-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full flex items-center justify-center font-extrabold text-[8px] border border-slate-200 dark:border-slate-700">
-                      {item.sellerName.charAt(0)}
-                    </div>
-                    <span className="font-bold truncate">{item.sellerName} {item.isMine && <span className="text-[9px] text-teal-600 dark:text-teal-400 font-extrabold">(Tú)</span>}</span>
+                <div className="space-y-3.5">
+                  {/* Meta Row: Category and time */}
+                  <div className="flex justify-between items-center select-none text-[10px]">
+                    <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest leading-none">
+                      {item.category}
+                    </span>
+                    <span className="font-medium text-slate-450 dark:text-slate-500 font-mono inline-flex items-center gap-1 leading-none">
+                      <Clock className="w-3.5 h-3.5" />
+                      {item.createdAt}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="truncate">{item.location}</span>
+
+                  {/* Main title */}
+                  <div className="space-y-1">
+                    <h3 className="font-display font-extrabold text-sm text-slate-850 dark:text-slate-100 leading-snug group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors duration-150 line-clamp-1">
+                      {item.title}
+                    </h3>
+                  </div>
+
+                  {/* Description snippet */}
+                  <p className="text-[11px] text-slate-450 dark:text-slate-400 font-normal leading-relaxed line-clamp-3 h-12">
+                    {item.description}
+                  </p>
+
+                  {/* Seller and Location summary */}
+                  <div className="pt-3 border-t border-slate-50 dark:border-slate-800/80 space-y-1.5 text-[11px]">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-350">
+                      <div className="w-4 h-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full flex items-center justify-center font-extrabold text-[8px] border border-slate-200 dark:border-slate-700 select-none">
+                        {item.sellerName.charAt(0)}
+                      </div>
+                      <span className="font-bold truncate">{item.sellerName} {item.isMine && <span className="text-[9px] text-teal-600 dark:text-teal-400 font-extrabold">(Tú)</span>}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="truncate">{item.location}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -641,6 +799,66 @@ export default function DentalMarketplace() {
                         required
                       />
                     </div>
+                  </div>
+
+                  {/* Image Upload Zone */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Foto del Material Dental:</label>
+                    <div 
+                      onDragEnter={handleDrag}
+                      onDragOver={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDrop={handleDrop}
+                      className={`relative border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center transition-all ${
+                        dragActive 
+                          ? "border-teal-500 bg-teal-500/5 dark:bg-teal-500/10 shadow-[0_0_15px_rgba(20,184,166,0.15)]" 
+                          : newImageUrl 
+                          ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/5"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-350 dark:hover:border-slate-650 bg-slate-50 dark:bg-slate-800/40"
+                      }`}
+                    >
+                      {newImageUrl ? (
+                        <div className="relative w-full max-w-xs h-36 rounded-lg overflow-hidden group/uploaded shadow-inner">
+                          <img 
+                            src={newImageUrl} 
+                            alt="Previsualización" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/uploaded:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setNewImageUrl("")}
+                              className="p-2 bg-red-650 hover:bg-red-750 text-white rounded-xl cursor-pointer shadow-md duration-150 flex items-center gap-1.5 text-xs font-bold"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-white" />
+                              <span>Eliminar foto</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="w-full cursor-pointer flex flex-col items-center justify-center py-2">
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleFileInput} 
+                            className="hidden" 
+                          />
+                          <UploadCloud className={`w-8 h-8 mb-2.5 transition-colors ${dragActive ? "text-teal-400 animate-bounce" : "text-slate-400 dark:text-slate-500"}`} />
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200 text-center">
+                            {dragActive ? "¡Suelto para cargar!" : "Arrastra tu imagen de producto aquí u"} 
+                            <span className="text-teal-600 dark:text-teal-400 font-extrabold hover:underline ml-1">hojea tus archivos</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-light">
+                            Soporta PNG, JPG, JPEG, WEBP de alta calidad
+                          </p>
+                        </label>
+                      )}
+                    </div>
+                    {imageError && (
+                      <p className="text-[10px] lg:text-xs font-bold text-red-500 mt-1.5 animate-pulse bg-red-50/10 dark:bg-red-950/20 px-3 py-1.5 border border-red-500/20 rounded-lg">
+                        ⚠️ Alert: {imageError}
+                      </p>
+                    )}
                   </div>
 
                   {/* Description Form */}

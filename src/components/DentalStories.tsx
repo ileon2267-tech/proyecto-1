@@ -125,6 +125,12 @@ export default function DentalStories() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Custom visual confirm and alert states
+  const [buyingStudyId, setBuyingStudyId] = useState<string | null>(null);
+  const [buyingStudyPrice, setBuyingStudyPrice] = useState<number>(0);
+  const [buyingStudyTitle, setBuyingStudyTitle] = useState<string>("");
+  const [unlockedSuccessText, setUnlockedSuccessText] = useState<string | null>(null);
+
   // Handlers
   const handleLikePost = (postId: string) => {
     setPosts((prev) =>
@@ -198,24 +204,38 @@ export default function DentalStories() {
   };
 
   const handleBuyStudy = (studyId: string, price: number, title: string) => {
-    if (confirm(`¿Deseas licenciar y desbloquear "${title}" por $${price} USD de tus fondos quirúrgicos de PerioSaaS?`)) {
-      setStudies((prev) =>
-        prev.map((study) => {
-          if (study.id === studyId) {
-            return { ...study, isUnlocked: true, purchases: study.purchases + 1 };
-          }
-          return study;
-        })
-      );
-      
-      // Update balance & purchase logs
-      setEarnings((prev) => Math.max(0, prev - price));
-      setWalletHistory([
-        { id: `w-${Date.now()}`, desc: `Compra de Estudio: ${title}`, amount: -price, date: "Hoy" },
-        ...walletHistory
-      ]);
-      alert("Estudio clínico desbloqueado. Ya puedes descargar los sets radiográficos complentos.");
-    }
+    setBuyingStudyId(studyId);
+    setBuyingStudyPrice(price);
+    setBuyingStudyTitle(title);
+  };
+
+  const executeBuyStudy = () => {
+    if (!buyingStudyId) return;
+    const studyId = buyingStudyId;
+    const price = buyingStudyPrice;
+    const title = buyingStudyTitle;
+
+    setStudies((prev) =>
+      prev.map((study) => {
+        if (study.id === studyId) {
+          return { ...study, isUnlocked: true, purchases: study.purchases + 1 };
+        }
+        return study;
+      })
+    );
+    
+    // Update balance & purchase logs
+    setEarnings((prev) => Math.max(0, prev - price));
+    setWalletHistory([
+      { id: `w-${Date.now()}`, desc: `Compra de Estudio: ${title}`, amount: -price, date: "Hoy" },
+      ...walletHistory
+    ]);
+
+    setBuyingStudyId(null);
+    setUnlockedSuccessText(`¡Estudio clínico "${title}" desbloqueado con éxito! Ya puedes descargar los de forma completa.`);
+    setTimeout(() => {
+      setUnlockedSuccessText(null);
+    }, 5000);
   };
 
   return (
@@ -596,6 +616,71 @@ export default function DentalStories() {
         </div>
       )}
       </div>
+
+      {/* Custom Buy Confirmation Dialog Overlay */}
+      <AnimatePresence>
+        {buyingStudyId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[210] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-[#09090b] border border-slate-200 dark:border-slate-800/80 rounded-[2rem] max-w-md w-full p-6 shadow-2xl relative"
+            >
+              <div className="space-y-4">
+                <div className="w-12 h-12 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl flex items-center justify-center border border-teal-500/20">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-lg text-slate-900 dark:text-white">¿Licenciar Estudio Clínico?</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                    ¿Deseas desbloquear <strong className="text-slate-950 dark:text-teal-300 font-bold">"{buyingStudyTitle}"</strong> por <span className="font-mono font-bold text-teal-600 dark:text-teal-400">${buyingStudyPrice} USD</span> de tus fondos quirúrgicos de PerioSaaS?
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={executeBuyStudy}
+                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs py-3 rounded-xl transition-all cursor-pointer shadow-md shadow-teal-600/10 active:scale-95"
+                  >
+                    Confirmar Compra
+                  </button>
+                  <button
+                    onClick={() => setBuyingStudyId(null)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700/60 active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Success Alert Toast */}
+      <AnimatePresence>
+        {unlockedSuccessText && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-[250] bg-zinc-950/90 text-white border border-teal-500/30 p-4 rounded-2xl shadow-2xl max-w-sm flex items-start gap-3 backdrop-blur-md"
+          >
+            <div className="p-1 bg-teal-500/20 text-teal-400 rounded-lg shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-teal-400">¡Caso Desbloqueado!</p>
+              <p className="text-[11px] text-slate-350 mt-0.5 leading-relaxed">{unlockedSuccessText}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

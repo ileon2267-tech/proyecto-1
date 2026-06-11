@@ -148,7 +148,7 @@ export default function PatientPortal({
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([
     {
       role: "assistant",
-      content: `¡Hola, ${activeUser.name}! Bienvenido a tu Portal del Paciente. Soy **Dentito IA**, tu copiloto virtual de salud oral. ¿Tienes alguna pregunta sobre tu tratamiento, dolor dental o cómo cuidar tus encías? Escríbeme y te guiaré con gusto.`
+      content: `¡Hola, ${activeUser.name}! Bienvenido a tu espacio de Paciente. Soy **Dentito IA**, tu copiloto virtual de salud oral. ¿Tienes alguna pregunta sobre tu tratamiento, dolor dental o cómo cuidar tus encías? Escríbeme y te guiaré con gusto.`
     }
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -256,13 +256,13 @@ export default function PatientPortal({
       )}
 
       {/* Top Main Navigation for Clinical Patients */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-150 dark:border-slate-800/80 p-4 shadow-sm">
+      <header className="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b-2 border-teal-500/40 dark:border-teal-500/35 p-4 shadow-[0_4px_20px_rgba(20,184,166,0.15)]">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Logo className="w-10 h-10" showNeon={true} />
             <div>
               <h1 className="font-display font-bold text-base leading-none text-slate-900 dark:text-white mb-0.5">PerioDash</h1>
-              <span className="text-[10px] text-teal-600 dark:text-teal-400 font-extrabold tracking-widest uppercase">Portal del Paciente</span>
+              <span className="text-[11px] text-teal-600 dark:text-teal-400 font-black tracking-widest uppercase bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20 shadow-[0_0_8px_rgba(20,184,166,0.2)]">Paciente</span>
             </div>
           </div>
 
@@ -295,7 +295,7 @@ export default function PatientPortal({
       <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
         
         {/* Welcome greeting card with premium layout */}
-        <div className="bg-gradient-to-r from-teal-900/20 via-teal-950/10 to-slate-900/40 rounded-3xl border border-teal-500/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-teal-950/35 via-teal-900/20 to-slate-900/45 rounded-3xl border border-teal-500/45 p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden shadow-[0_0_20px_rgba(20,184,166,0.25)]">
           <div className="space-y-2 max-w-2xl">
             <span className="text-[10px] bg-teal-500/10 border border-teal-500/25 text-teal-600 dark:text-teal-400 font-extrabold uppercase px-3 py-1 rounded-full tracking-widest inline-flex items-center gap-1">
               <Sparkles className="w-3 h-3" /> Acceso Paciente Seguro
@@ -304,7 +304,7 @@ export default function PatientPortal({
               ¡Hola, {activeUser.name}!
             </h2>
             <p className="text-xs md:text-sm text-slate-400 leading-relaxed font-light">
-              Desde tu portal puedes buscar clínicas autorizadas PerioDash, coordinar nuevas consultas presenciales con los mejores especialistas de la región y revisar recomendaciones médicas en tiempo real.
+              Desde tu acceso de Paciente puedes buscar clínicas autorizadas PerioDash, coordinar nuevas consultas presenciales con los mejores especialistas de la región y revisar recomendaciones médicas en tiempo real.
             </p>
           </div>
           
@@ -320,13 +320,109 @@ export default function PatientPortal({
           </div>
         </div>
 
+        {/* CLINICAL METRICS CARD & TREATMENT TIMELINE */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 bg-white dark:bg-slate-900/40 border-2 border-teal-500/20 dark:border-teal-500/25 rounded-3xl p-6 shadow-[0_0_15px_rgba(20,184,166,0.05)] relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+              <Activity className="w-40 h-40 text-teal-400" />
+            </div>
+            
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <span className="text-[9px] bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-widest leading-none flex items-center gap-1 w-max">
+                  <Activity className="w-3 h-3" /> Reporte Periodontal Automatizado
+                </span>
+                <h3 className="text-md font-display font-black text-slate-900 dark:text-white mt-2">Mediciones Clínicas Recientes</h3>
+                <p className="text-xs text-slate-400 font-medium">Sincronizado directamente desde tu odontograma y periodontograma clínico en consulta.</p>
+              </div>
+              <span className="text-[10px] text-teal-500 font-mono font-bold bg-teal-500/5 border border-teal-500/10 rounded px-2 py-0.5 shrink-0">
+                FDI Adulto 32p
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Biofilm O'Leary</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <h4 className="text-lg font-black text-emerald-500">12.5%</h4>
+                  <span className="text-[8px] font-bold text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded">Sano</span>
+                </div>
+                <p className="text-[8px] text-slate-450 mt-1 leading-none">Meta recomendada: &lt;20%</p>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Prof. Sondaje</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <h4 className="text-lg font-black text-teal-500">1.8 mm</h4>
+                  <span className="text-[8px] font-bold text-teal-500 bg-teal-500/10 px-1 py-0.2 rounded">Óptimo</span>
+                </div>
+                <p className="text-[8px] text-slate-450 mt-1 leading-none">Meta recomendada: &lt;3mm</p>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sangrado BOP</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <h4 className="text-lg font-black text-emerald-500">3.2%</h4>
+                  <span className="text-[8px] font-bold text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded">Leve</span>
+                </div>
+                <p className="text-[8px] text-slate-450 mt-1 leading-none">Meta recomendada: &lt;10%</p>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Soporte Alveolar</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <h4 className="text-lg font-black text-teal-500">95.4%</h4>
+                  <span className="text-[8px] font-bold text-teal-500 bg-teal-500/10 px-1 py-0.2 rounded">Excelente</span>
+                </div>
+                <p className="text-[8px] text-slate-450 mt-1 leading-none">Nivel óseo estable</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Treatment plan Progress Timeline */}
+          <div className="bg-white dark:bg-slate-900/40 border-2 border-cyan-500/20 dark:border-cyan-500/25 rounded-3xl p-6 shadow-[0_0_15px_rgba(6,182,212,0.05)] flex flex-col justify-between">
+            <div>
+              <span className="text-[9px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-widest leading-none flex items-center gap-1 w-max">
+                <FileCheck2 className="w-3 h-3" /> PLAN DE TRATAMIENTO
+              </span>
+              <h3 className="text-md font-display font-black text-slate-900 dark:text-white mt-2 leading-none">Tu Progreso</h3>
+            </div>
+
+            <div className="space-y-4 my-2 font-sans text-xs flex-grow justify-center flex flex-col">
+              <div className="flex items-start gap-2.5">
+                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 font-extrabold text-[9px]">✓</div>
+                <div>
+                  <p className="font-bold leading-tight text-slate-900 dark:text-white">Cureta Cuadrante</p>
+                  <span className="text-[9px] text-slate-450 block leading-none">Completado • Cuadrante IA</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 font-extrabold text-[9px]">✓</div>
+                <div>
+                  <p className="font-bold leading-tight text-slate-900 dark:text-white">Perfil O'Leary</p>
+                  <span className="text-[9px] text-slate-450 block leading-none">Completado • Biofilm 12.5%</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <div className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500 text-teal-400 flex items-center justify-center shrink-0 font-extrabold text-[9px]">●</div>
+                <div>
+                  <p className="font-bold leading-tight text-teal-400">Control Periodontal</p>
+                  <span className="text-[9px] text-teal-500 font-semibold block leading-none">Próxima sesión • 10:00 AM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* LEFT PANEL: Directory Search, Clinical Tip, and Book form */}
           <div className="lg:col-span-8 space-y-8">
             
             {/* 1. Clinicians Directory & Clinics Search Engine */}
-            <div className="bg-white dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 rounded-3xl p-6 space-y-6">
+            <div className="bg-white dark:bg-slate-900/40 border-2 border-teal-500/30 dark:border-teal-500/30 rounded-3xl p-6 space-y-6 shadow-[0_0_22px_rgba(20,184,166,0.18)]">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-5">
                 <div>
                   <h3 className="text-md font-display font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -392,6 +488,23 @@ export default function PatientPortal({
                           <p className="truncate">🏢 {doc.clinic}</p>
                           <p>📅 {doc.availability}</p>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedClinician(doc.id);
+                            const el = document.getElementById("reserva-form");
+                            if (el) {
+                              el.scrollIntoView({ behavior: "smooth" });
+                              el.classList.add("ring-2", "ring-teal-500", "duration-500");
+                              setTimeout(() => el.classList.remove("ring-2", "ring-teal-500"), 2000);
+                            }
+                          }}
+                          className="mt-3 w-full py-2 bg-teal-500/10 hover:bg-teal-600 text-teal-600 dark:text-teal-400 dark:hover:text-white font-extrabold text-[10px] rounded-xl border border-teal-500/25 dark:border-teal-400/20 hover:border-teal-400 transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          Reservar Cita
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -449,7 +562,7 @@ export default function PatientPortal({
             </div>
 
             {/* 2. CLINICAL APPOINTMENT REQUEST FORM */}
-            <div className="bg-white dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 rounded-3xl p-6 space-y-6">
+            <div id="reserva-form" className="bg-white dark:bg-slate-900/40 border-2 border-cyan-500/35 dark:border-cyan-500/30 rounded-3xl p-6 space-y-6 shadow-[0_0_22px_rgba(6,182,212,0.18)] transition-all">
               <div>
                 <h3 className="text-md font-display font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-teal-500" />
@@ -580,7 +693,7 @@ export default function PatientPortal({
           <div className="lg:col-span-4 space-y-8">
             
             {/* A) MY UPCOMING APPOINTMENTS */}
-            <div className="bg-white dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 rounded-3xl p-6 space-y-5">
+            <div className="bg-white dark:bg-slate-900/40 border-2 border-emerald-500/35 dark:border-emerald-500/30 rounded-3xl p-6 space-y-5 shadow-[0_0_22px_rgba(16,185,129,0.18)]">
               <div>
                 <h4 className="text-xs font-black uppercase text-teal-600 dark:text-teal-400 tracking-widest block font-sans">
                   Mis Próximas Citas
@@ -637,7 +750,7 @@ export default function PatientPortal({
             </div>
 
             {/* B) DENTITO PERSONAL PATIENT CO-PILOT CHAT */}
-            <div className="bg-white dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 rounded-3xl p-6 flex flex-col h-[480px]">
+            <div className="bg-white dark:bg-slate-900/40 border-2 border-indigo-500/35 dark:border-indigo-500/30 rounded-3xl p-6 flex flex-col h-[480px] shadow-[0_0_24px_rgba(99,102,241,0.18)]">
               <div className="pb-4 border-b border-slate-150 dark:border-slate-800/60 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-500 flex items-center justify-center font-bold text-xs ring-1 ring-teal-500/30">
                   🤖

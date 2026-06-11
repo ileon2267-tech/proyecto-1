@@ -28,15 +28,6 @@ interface LoginScreenProps {
 
 // Read or initialize custom user data list
 const getStoredUsers = (): ClinicalUser[] => {
-  const saved = localStorage.getItem("perioUsuarios");
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      // fallback
-    }
-  }
-  
   const defaultUsers: ClinicalUser[] = [
     {
       id: "usr-default",
@@ -47,8 +38,38 @@ const getStoredUsers = (): ClinicalUser[] => {
       role: "odontologo",
       specialty: "Periodoncia e Implantología",
       createdAt: new Date().toISOString()
+    },
+    {
+      id: "usr-patient-default",
+      name: "Carlos Mendoza Ramos",
+      email: "paciente@periodash.com",
+      password: "paciente123",
+      profile: "cliente",
+      role: "cliente",
+      createdAt: new Date().toISOString()
     }
   ];
+
+  const saved = localStorage.getItem("perioUsuarios");
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved) as ClinicalUser[];
+      let updated = false;
+      defaultUsers.forEach(defUser => {
+        if (!parsed.some(u => u.email.toLowerCase() === defUser.email.toLowerCase())) {
+          parsed.push(defUser);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem("perioUsuarios", JSON.stringify(parsed));
+      }
+      return parsed;
+    } catch (e) {
+      // fallback
+    }
+  }
+  
   localStorage.setItem("perioUsuarios", JSON.stringify(defaultUsers));
   return defaultUsers;
 };
@@ -82,17 +103,18 @@ export default function LoginScreen({ onLogin, defaultEmail = "ileon2267@gmail.c
   };
 
   // Perform Clinical Authentication
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = (e: React.FormEvent, overrideEmail?: string, overridePassword?: string) => {
     e.preventDefault();
     setLoginError(null);
 
-    const emailTrim = loginEmail.trim().toLowerCase();
+    const emailTrim = (overrideEmail !== undefined ? overrideEmail : loginEmail).trim().toLowerCase();
+    const finalPassword = overridePassword !== undefined ? overridePassword : loginPassword;
     
     if (!emailTrim) {
       setLoginError("Por favor, ingrese un correo electrónico válido.");
       return;
     }
-    if (!loginPassword) {
+    if (!finalPassword) {
       setLoginError("La contraseña es requerida.");
       return;
     }
@@ -101,7 +123,7 @@ export default function LoginScreen({ onLogin, defaultEmail = "ileon2267@gmail.c
 
     // Verify against DB.usuarios in local state
     setTimeout(() => {
-      const match = users.find(u => u.email.toLowerCase() === emailTrim && u.password === loginPassword);
+      const match = users.find(u => u.email.toLowerCase() === emailTrim && u.password === finalPassword);
       
       if (match) {
         setIsLoading(false);
@@ -249,8 +271,12 @@ export default function LoginScreen({ onLogin, defaultEmail = "ileon2267@gmail.c
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full max-w-lg"
       >
-        {/* Core Auth Panel */}
-        <div className={`rounded-3xl border p-8 backdrop-blur-xl relative overflow-hidden transition-all ${darkMode ? "bg-slate-900/60 border-slate-800/80 shadow-[0_8px_32px_rgba(0,0,0,0.37)]" : "bg-white border-slate-100 shadow-[0_12px_40px_rgba(15,23,42,0.06)]"}`}>
+        {/* Core Auth Panel with Vibrant Neon Border */}
+        <div className={`rounded-3xl border-2 p-8 backdrop-blur-2xl relative overflow-hidden transition-all duration-500 ${
+          darkMode 
+            ? "bg-slate-950/80 border-teal-500/40 shadow-[0_0_35px_rgba(20,184,166,0.22)]" 
+            : "bg-white/95 border-emerald-500/25 shadow-[0_15px_45px_rgba(16,185,129,0.08)]"
+        }`}>
           
           {/* Subtle top decoration beam */}
           <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
@@ -331,6 +357,65 @@ export default function LoginScreen({ onLogin, defaultEmail = "ileon2267@gmail.c
                 transition={{ duration: 0.2 }}
                 className="space-y-5"
               >
+                {/* Visual Demo Quick Access Badge presets */}
+                <div className={`p-4 rounded-2xl space-y-2.5 border transition-all ${
+                  darkMode 
+                    ? "bg-slate-950/60 border-teal-500/25 shadow-[0_0_15px_rgba(20,184,166,0.1)]" 
+                    : "bg-slate-50/55 border-emerald-500/15"
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${darkMode ? "text-teal-400" : "text-emerald-700"} flex items-center gap-1`}>
+                      <span className="animate-pulse text-teal-400">⚡</span> ACCESO RÁPIDO COMPLETO
+                    </span>
+                    <span className="text-[9px] text-slate-450 font-medium">Un clic, sin contraseñas</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setLoginEmail("ileon2267@gmail.com");
+                        setLoginPassword("admin123");
+                        handleLoginSubmit(e, "ileon2267@gmail.com", "admin123");
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-2 ${
+                        darkMode 
+                          ? "bg-slate-900 border-teal-555/20 hover:border-teal-400 text-white hover:bg-slate-800" 
+                          : "bg-white border-emerald-500/20 hover:border-emerald-500/40 text-slate-800 hover:bg-emerald-50/20 shadow-xs"
+                      }`}
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-500 shrink-0 font-extrabold text-[10px] ring-1 ring-teal-500/20">
+                        DR
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black truncate leading-tight">Médico / Dr.</p>
+                        <span className="text-[8.5px] text-slate-450 block leading-none truncate">Dr. Ignacio León</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setLoginEmail("paciente@periodash.com");
+                        setLoginPassword("paciente123");
+                        handleLoginSubmit(e, "paciente@periodash.com", "paciente123");
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-2 ${
+                        darkMode 
+                          ? "bg-slate-900 border-cyan-500/20 hover:border-cyan-400 text-white hover:bg-slate-800" 
+                          : "bg-white border-cyan-500/20 hover:border-cyan-500/40 text-slate-800 hover:bg-cyan-50/20 shadow-xs"
+                      }`}
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 shrink-0 font-extrabold text-[10px] ring-1 ring-cyan-500/20">
+                        PA
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black truncate leading-tight text-cyan-500">Paciente</p>
+                        <span className="text-[8.5px] text-slate-450 block leading-none truncate">Carlos Mendoza</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Form Error Message */}
                 {loginError && (
                   <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs rounded-xl font-medium animate-pulse">
@@ -548,17 +633,24 @@ export default function LoginScreen({ onLogin, defaultEmail = "ileon2267@gmail.c
                       { id: "particular", title: "Profesional", desc: "Particular (Odontólogo)", icon: Stethoscope },
                       { id: "clinica", title: "Clínica", desc: "Gestión & Auditoría", icon: Briefcase },
                       { id: "universidad", title: "Universidad", desc: "Docente / Académico", icon: GraduationCap },
-                      { id: "cliente", title: "Cliente", desc: "Portal de Paciente", icon: Users }
+                      { id: "cliente", title: "Paciente", desc: "Módulo del Paciente", icon: Users }
                     ].map((prof) => {
                       const Icon = prof.icon;
                       const isSelected = regProfile === prof.id;
+                      const isPatient = prof.id === "cliente";
                       return (
                         <div
                           key={prof.id}
                           onClick={() => setRegProfile(prof.id as any)}
                           className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-2.5 relative select-none ${
                             isSelected
-                              ? "bg-teal-500/10 border-teal-500/45 dark:border-teal-500/60 ring-1 ring-teal-500/20"
+                              ? isPatient
+                                ? "bg-teal-500/10 border-teal-400 dark:border-teal-400/80 ring-2 ring-teal-500/30 shadow-[0_0_15px_rgba(20,184,166,0.5)]"
+                                : "bg-teal-500/10 border-teal-500/45 dark:border-teal-500/60 ring-1 ring-teal-500/20"
+                              : isPatient
+                              ? darkMode
+                                ? "bg-slate-950 border-teal-500/20 hover:border-teal-500/40 hover:shadow-[0_0_8px_rgba(20,184,166,0.25)]"
+                                : "bg-white border-emerald-500/20 hover:bg-emerald-50/10 hover:border-emerald-500/40"
                               : (darkMode ? "bg-slate-950 border-slate-800 hover:border-slate-700" : "bg-slate-50 border-slate-200 hover:bg-slate-100")
                           }`}
                         >

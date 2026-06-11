@@ -43,10 +43,12 @@ export interface OLearyState {
 export interface Anamnesis {
   hta: boolean;
   diabetes: boolean;
+  diabetesStatus?: "none" | "controlled" | "severe";
   tabaquismo: number; // cigarrillos/dia
   alergias: string;
   dolorActual: "ninguno" | "leve" | "pulsatil" | "agudo";
   notasSistemicas: string;
+  edadSimulada?: number;
 }
 
 export interface XRayImage {
