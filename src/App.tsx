@@ -48,6 +48,8 @@ import {
   UserPlus, 
   ShieldCheck, 
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
   Printer,
   ChevronRight,
   ClipboardList,
@@ -169,6 +171,7 @@ export default function App() {
   // Doctor's custom metadata states
   const [doctorName, setDoctorName] = useState("Dr. Ignacio León");
   const [clinicName, setClinicName] = useState("PerioClinic Providencia");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Patient Registration Form states
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -1517,41 +1520,55 @@ export default function App() {
       )}
 
       {/* SIDEBAR ON DESKTOP - HIDDEN ON MOBILE */}
-      <aside className="w-64 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-100 dark:border-slate-800/50 flex flex-col py-6 sticky top-0 h-screen hidden md:flex shrink-0 no-print z-10 transition-colors overflow-y-auto scrollbar-thin">
+      <aside className={`${isSidebarCollapsed ? "w-20" : "w-64"} bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-100 dark:border-slate-800/50 flex flex-col py-6 sticky top-0 h-screen hidden md:flex shrink-0 no-print z-10 transition-[width] duration-300 overflow-y-auto overflow-x-hidden scrollbar-none relative`}>
         
+        {/* Toggle Button */}
+        <button 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute top-7 right-3 w-6 h-6 bg-slate-100 hover:bg-teal-100 dark:bg-slate-800 dark:hover:bg-teal-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 rounded-lg flex items-center justify-center cursor-pointer transition-colors z-20"
+        >
+          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
         {/* Brand Header */}
-        <div className="px-5 pb-5 border-b border-slate-50 dark:border-slate-800 flex items-center gap-4">
-          <Logo className="w-10 h-10" showNeon={true} />
-          <div>
-            <h1 className="font-display font-bold text-base leading-none text-slate-900 dark:text-white mb-[2px]">PerioDash</h1>
-            <span className="text-[10px] text-teal-600 dark:text-teal-400 font-extrabold tracking-widest uppercase">v15 Pro Edition</span>
-          </div>
+        <div className={`px-5 pb-5 border-b border-slate-50 dark:border-slate-800 flex items-center gap-4 transition-all ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
+          <Logo className={`shrink-0 ${isSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`} showNeon={true} />
+          {!isSidebarCollapsed && (
+            <div className="whitespace-nowrap overflow-hidden">
+              <h1 className="font-display font-bold text-base leading-none text-slate-900 dark:text-white mb-[2px]">PerioDash</h1>
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 font-extrabold tracking-widest uppercase">v15 Pro Edition</span>
+            </div>
+          )}
         </div>
 
         {/* Doctor Identity Context Card */}
-        <div className="mx-4 my-4 bg-slate-50/70 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1 flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 text-slate-100 flex items-center justify-center text-xs font-bold shrink-0 font-mono shadow-xs border border-slate-800">
-            DR
+        {!isSidebarCollapsed && (
+          <div className="mx-4 my-4 bg-slate-50/70 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1 flex items-center gap-2.5 whitespace-nowrap overflow-hidden transition-all duration-300">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-slate-100 flex items-center justify-center text-xs font-bold shrink-0 font-mono shadow-xs border border-slate-800">
+              DR
+            </div>
+            <div className="overflow-hidden">
+               <div className="text-[11px] font-bold text-slate-800 dark:text-slate-100 truncate">{doctorName}</div>
+               <div className="text-[9px] text-slate-400 truncate tracking-tight">{clinicName}</div>
+            </div>
           </div>
-          <div className="overflow-hidden">
-             <div className="text-[11px] font-bold text-slate-800 dark:text-slate-100 truncate">{doctorName}</div>
-             <div className="text-[9px] text-slate-400 truncate tracking-tight">{clinicName}</div>
-          </div>
-        </div>
+        )}
 
         {/* Quick Search Trigger Pill */}
-        <div className="px-4 mb-4">
+        <div className={`px-4 ${isSidebarCollapsed ? 'mt-4 mb-4' : 'mb-4'}`}>
           <button 
             onClick={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
-            className="w-full py-2 px-3 bg-slate-50/50 hover:bg-slate-100/80 dark:bg-slate-800/40 dark:hover:bg-slate-800/80 border border-slate-100 dark:border-slate-800/50 text-slate-450 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all flex items-center justify-between text-left cursor-pointer group"
+            className={`w-full py-2 bg-slate-50/50 hover:bg-slate-100/80 dark:bg-slate-800/40 dark:hover:bg-slate-800/80 border border-slate-100 dark:border-slate-800/50 text-slate-450 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all flex items-center cursor-pointer group ${isSidebarCollapsed ? 'px-2 justify-center' : 'px-3 justify-between text-left'}`}
           >
             <div className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
-              <span className="text-[10.5px] font-medium">Buscador instantáneo</span>
+              <Search className="w-4 h-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+              {!isSidebarCollapsed && <span className="text-[10.5px] font-medium whitespace-nowrap">Buscador</span>}
             </div>
-            <kbd className="text-[8.5px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-500 rounded px-1 py-0.5 tracking-tight font-mono font-bold">
-              Ctrl+K
-            </kbd>
+            {!isSidebarCollapsed && (
+              <kbd className="text-[8.5px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-500 rounded px-1 py-0.5 tracking-tight font-mono font-bold shrink-0">
+                Ctrl+K
+              </kbd>
+            )}
           </button>
         </div>
 
@@ -1564,7 +1581,7 @@ export default function App() {
             { id: "finanzas", label: "Plan & Finanzas", icon: Banknote },
             { id: "bolsa-empleo", label: "Bolsa de Empleo", icon: Briefcase },
             { id: "reportes", label: "Imp / Reportes", icon: Printer },
-            { id: "dentalstories", label: "DentalStories / Hub", icon: MessageSquare },
+            { id: "dentalstories", label: "DentalStories", icon: MessageSquare },
             { id: "tienda", label: "Mercado Dental", icon: ShoppingBag },
             { id: "ajustes", label: "Ajustes", icon: Settings }
           ].map((item) => {
@@ -1574,8 +1591,9 @@ export default function App() {
             return (
               <button
                 key={item.id}
+                title={isSidebarCollapsed ? item.label : undefined}
                 onClick={() => setActiveTab(item.id as ActiveTab)}
-                className={`w-full text-left font-bold text-xs py-3 px-3.5 rounded-xl transition-all cursor-pointer inline-flex items-center gap-3 ${
+                className={`w-full text-left font-bold text-xs py-3 rounded-xl transition-all cursor-pointer inline-flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'} ${
                   isActive
                     ? isNeon
                       ? "bg-gradient-to-r from-teal-600 via-teal-500 to-indigo-650 text-white shadow-[0_0_16px_rgba(20,184,166,0.55)] scale-[1.03]"
@@ -1594,30 +1612,33 @@ export default function App() {
                   )}
                   <ActiveIcon className={`w-4 h-4 relative z-10 ${isNeon ? (isActive ? 'text-white scale-110' : 'text-slate-700 dark:text-slate-200') : ''}`} />
                 </div>
-                <span>{item.label}</span>
+                {!isSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
               </button>
             );
           })}
 
           <button
             onClick={handleLogout}
-            className="w-full text-left font-bold text-xs py-3 px-3.5 mt-2 rounded-xl transition-all cursor-pointer text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:bg-red-500/10 inline-flex items-center gap-3"
+            title={isSidebarCollapsed ? "Cerrar sesión" : undefined}
+            className={`w-full text-left font-bold text-xs py-3 mt-2 rounded-xl transition-all cursor-pointer text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:bg-red-500/10 inline-flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'}`}
           >
             <div className="relative flex items-center justify-center shrink-0">
               <LogOut className="w-4 h-4" />
             </div>
-            <span>Cerrar sesión</span>
+            {!isSidebarCollapsed && <span className="whitespace-nowrap">Cerrar sesión</span>}
           </button>
         </nav>
 
         {/* Footer info lock indicator */}
-        <div className="px-5 pt-4 border-t border-slate-50 dark:border-slate-800 text-[10px] text-slate-400 space-y-1">
-          <p className="font-semibold">Licencia Profesional Activa</p>
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono">Encriptación SSL Local</span>
+        {!isSidebarCollapsed && (
+          <div className="px-5 pt-4 border-t border-slate-50 dark:border-slate-800 text-[10px] text-slate-400 space-y-1 mt-auto overflow-hidden whitespace-nowrap transition-all duration-300">
+            <p className="font-semibold">Licencia Profesional Activa</p>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-mono">Encriptación SSL Local</span>
+            </div>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* MOBILE CONTAINER HEADER */}
