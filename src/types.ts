@@ -41,6 +41,8 @@ export interface OLearyState {
 }
 
 export interface Anamnesis {
+  motivoConsulta?: string;
+  historiaMotivoConsulta?: string;
   hta: boolean;
   diabetes: boolean;
   diabetesStatus?: "none" | "controlled" | "severe";
@@ -83,6 +85,13 @@ export interface Evolution {
   professional: string;
 }
 
+export interface Consentimiento {
+  id: string;
+  date: string;
+  documentType: string;
+  signature: string | null; // null if not signed
+}
+
 export interface Patient {
   id: string;
   name: string;
@@ -98,6 +107,9 @@ export interface Patient {
   xRays: XRayImage[];
   treatmentPlan: TreatmentPlan;
   evolutions: Evolution[];
+  consentimientos?: Consentimiento[];
+  activeSpecialty?: string;
+  specialtyData?: Record<string, any>;
 }
 
 export interface Appointment {

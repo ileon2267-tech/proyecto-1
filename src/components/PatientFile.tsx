@@ -1,7 +1,33 @@
-import React, { useState } from 'react';
-import { Patient, Evolution, Anamnesis } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Patient, Evolution, Anamnesis, Consentimiento } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Save, Plus, FileText, HeartPulse, Activity, User, Calendar, Trash2, Edit2 } from 'lucide-react';
+import { 
+  Save, 
+  Plus, 
+  FileText, 
+  HeartPulse, 
+  Activity, 
+  User, 
+  Calendar, 
+  Trash2, 
+  PenTool, 
+  X, 
+  RotateCcw, 
+  Check, 
+  ShieldAlert,
+  Zap,
+  Layers,
+  Scissors,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  FileCheck,
+  Sparkles,
+  Baby,
+  Info,
+  ChevronRight,
+  HelpCircle
+} from 'lucide-react';
 
 interface PatientFileProps {
   patient: Patient;
@@ -9,11 +35,177 @@ interface PatientFileProps {
   onClose: () => void;
 }
 
+const ToggleHeader = ({ id, icon: Icon, title, description, expandedSection, setExpandedSection, rightElement }: any) => {
+  const isOpen = expandedSection === id;
+  return (
+    <div 
+       onClick={() => setExpandedSection(isOpen ? '' : id)}
+       className={`flex items-center justify-between p-4 sm:p-5 cursor-pointer transition-colors ${isOpen ? 'bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
+    >
+       <div className="flex items-center gap-3">
+         <div className={`p-2 rounded-xl transition-colors ${isOpen ? 'bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+            <Icon className="w-5 h-5" />
+         </div>
+         <div className="flex flex-col text-left">
+           <h3 className={`font-bold transition-colors ${isOpen ? 'text-teal-700 dark:text-teal-400' : 'text-slate-700 dark:text-slate-300'}`}>{title}</h3>
+           {description && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{description}</p>}
+         </div>
+       </div>
+       <div className="flex items-center gap-4">
+         {rightElement && (
+           <div onClick={(e) => e.stopPropagation()}>
+             {rightElement}
+           </div>
+         )}
+         <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+       </div>
+    </div>
+  )
+}
+
 export default function PatientFile({ patient, onUpdatePatient, onClose }: PatientFileProps) {
-  const [activeTab, setActiveTab] = useState<'anamnesis' | 'evoluciones'>('anamnesis');
+  const [activeTab, setActiveTab] = useState<'anamnesis' | 'evoluciones' | 'consentimientos'>('anamnesis');
+  const [expandedSection, setExpandedSection] = useState<string>('motivo');
+  
+  // Consentimientos state
+  const consentimientos = patient.consentimientos || [];
+  const [newConsentType, setNewConsentType] = useState('Consentimiento General Quirúrgico');
+  
+  // Signature Drawing state
+  const [signingId, setSigningId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  // Legal Texts for Consents
+  const CONSENT_TEXTS: Record<string, string> = {
+    'Consentimiento General Quirúrgico': `INFORMACIÓN DE PROCEDIMIENTOS QUIRÚRGICOS DENTALES (Extracciones, Implantes, Cirugías):
+
+Yo, el firmante, por la presente doy el consentimiento para que los profesionales de PerioClinic realicen los procedimientos quirúrgicos bucales requeridos en mi plan de cuidados. Comprendo que intervenciones como exodoncias bucales sencillas o complejas, así como la colocación de implantes oseointegrados, conllevan ciertos riesgos y eventuales efectos secundarios inherentes:
+1. Dolor localizado y molestias posoperatorias manejables mediante analgésicos.
+2. Sangrado controlado o hematomas pasajeros en el área de intervención.
+3. Posible inflamación de los tejidos blandos durante 48 a 72 horas.
+4. Riesgo infrecuente de parestesias pasajeras o infección menor.
+
+He sido debidamente informado(a) sobre los autocuidados posoperatorios, la necesidad de higiene rigurosa, y acepto acatar todas las indicaciones médicas impartidas.`,
+
+    'Consentimiento Periodontal': `INFORMACIÓN Y REQUISITOS DEL TRATAMIENTO DE PERIODONCIA (Destartraje, Alisado Radicular, Mantenimiento):
+
+Yo declaro estar plenamente informado(a) acerca de mi diagnóstico de salud de los tejidos que soportan mis dientes (Periodontitis / Gingivitis) y las indicaciones del plan terapéutico. Comprendo que el tratamiento periodontal clínico persigue detener o retrasar el avance de la enfermedad activa mediante raspaje profundo mecánico, alisado de raíces y, de ser necesario, cirugías periodontales de colgajo.
+Declaro comprender los riesgos y consecuencias normales del tratamiento:
+1. Sensibilidad térmica transitoria de las piezas al calor o frío.
+2. Retracción natural de encías a su nivel no inflamado (los dientes lucirán más largos tras sanarse el edema).
+3. Ligera movilidad residual transitoria en piezas con soporte óseo mermado.
+4. Requerimiento ineludible de asistir a las citas de re-evaluación periodontal y mantenciones periódicas indicadas.`,
+
+    'Consentimiento Endodoncia': `INFORMACIÓN DE PROCEDIMIENTO DE ENDODONCIA (Tratamiento de Conductos):
+
+Por el presente documento, apruebo la realización de la terapia endodóntica (tratamiento e irrigación de conductos radiculares). Comprendo que el fin prioritario es aliviar el dolor agudo o crónico e intentar salvar y conservar la pieza dental afectada por un proceso de necrosis o pulpitis irreversible.
+Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
+1. Posibilidad de molestias temporales tras la cita clínica al cerrarse o irrigarse la pieza.
+2. Riesgo inherente de fracturas de instrumentos finos en conductos estrechos, curvos o calcificados.
+3. Posibilidad de decoloración pasiva de la corona con el transcurso de los años.
+4. Necesidad ineludible de restaurar permanentemente el diente (con perno y corona o incrustación) inmediatamente después de culminar la endodoncia para evitar fracturas catastróficas.`
+  };
+
+  const handleAddConsentimiento = () => {
+    const newConsent: Consentimiento = {
+      id: `cons-${Date.now()}`,
+      date: new Date().toISOString(),
+      documentType: newConsentType,
+      signature: null,
+    };
+    onUpdatePatient({
+      ...patient,
+      consentimientos: [...consentimientos, newConsent]
+    });
+  };
+
+  const handleSignConsentimiento = (id: string) => {
+    setSigningId(id);
+  };
+
+  const handleDeleteConsentimiento = (id: string) => {
+    const updated = consentimientos.filter(c => c.id !== id);
+    onUpdatePatient({ ...patient, consentimientos: updated });
+  };
+
+  // Canvas Drawing logic for mobile & desktop
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.strokeStyle = '#0d9488'; // teal-600
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    const coords = getEventCoords(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(coords.x, coords.y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const coords = getEventCoords(e, canvas);
+    ctx.lineTo(coords.x, coords.y);
+    ctx.stroke();
+    
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const saveSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !signingId) return;
+    
+    const signatureDataUrl = canvas.toDataURL('image/png');
+    const updated = consentimientos.map(c => 
+      c.id === signingId ? { ...c, signature: signatureDataUrl } : c
+    );
+    
+    onUpdatePatient({ ...patient, consentimientos: updated });
+    setSigningId(null);
+  };
+
+  const getEventCoords = (e: any, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
   
   // Anamnesis State
   const [anamnesis, setAnamnesis] = useState<Anamnesis>(patient.anamnesis || {
+    motivoConsulta: "",
+    historiaMotivoConsulta: "",
     hta: false,
     diabetes: false,
     tabaquismo: 0,
@@ -22,7 +214,29 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
     notasSistemicas: "",
   });
 
+  const [activeSpecialty, setActiveSpecialty] = useState<string>(patient.activeSpecialty || "periodoncia");
+  const [specialtyData, setSpecialtyData] = useState<Record<string, any>>(patient.specialtyData || {});
+
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Sync state if patient changes
+  useEffect(() => {
+    if (patient) {
+      setAnamnesis(patient.anamnesis || {
+        motivoConsulta: "",
+        historiaMotivoConsulta: "",
+        hta: false,
+        diabetes: false,
+        tabaquismo: 0,
+        alergias: "",
+        dolorActual: "ninguno",
+        notasSistemicas: "",
+      });
+      setActiveSpecialty(patient.activeSpecialty || "periodoncia");
+      setSpecialtyData(patient.specialtyData || {});
+      setEvolutions(patient.evolutions || []);
+    }
+  }, [patient]);
 
   // Evolutions State
   const [evolutions, setEvolutions] = useState<Evolution[]>(patient.evolutions || []);
@@ -30,7 +244,12 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
   const [deletingEvolutionId, setDeletingEvolutionId] = useState<string | null>(null);
 
   const handleSaveAnamnesis = () => {
-    onUpdatePatient({ ...patient, anamnesis });
+    onUpdatePatient({ 
+      ...patient, 
+      anamnesis,
+      activeSpecialty,
+      specialtyData
+    });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -62,41 +281,13 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden relative w-full"
+      exit={{ opacity: 0, y: -5 }}
+      className="w-full text-slate-800 dark:text-slate-200"
     >
-      {/* Header */}
-      <div className="bg-slate-50 dark:bg-slate-800 p-6 flex justify-between items-start md:items-center border-b border-slate-100 dark:border-slate-800 flex-col md:flex-row gap-4">
-        <div className="flex flex-row items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center font-display font-black text-2xl text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800 uppercase shadow-sm">
-            {patient.name.charAt(0)}
-          </div>
-          <div>
-            <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white leading-tight">
-              {patient.name}
-            </h2>
-            <div className="text-sm text-slate-500 font-normal flex flex-wrap gap-x-4 gap-y-1 mt-1">
-              <span className="inline-flex items-center gap-1"><User className="w-3.5 h-3.5"/> ID: {patient.id.split('-')[1]}</span>
-              <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5"/> Nacimiento: {patient.birthdate}</span>
-            </div>
-          </div>
-        </div>
-        <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl transition-colors font-bold text-sm">
-          Cerrar Ficha
-        </button>
-      </div>
-
-      {/* Basic Contact Info */}
-      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap gap-6 text-sm text-slate-600 dark:text-slate-300">
-        <div><strong>Teléfono:</strong> {patient.phone || "N/A"}</div>
-        <div><strong>Email:</strong> {patient.email || "N/A"}</div>
-        <div className="w-full"><strong>Notas Generales:</strong> {patient.notes || "Sin notas"}</div>
-      </div>
-
       {/* Tabs */}
-      <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-6">
+      <div className="flex border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl px-6 pt-2">
         <button
           onClick={() => setActiveTab('anamnesis')}
           className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
@@ -119,6 +310,17 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
           <Activity className="w-4 h-4" />
           Evoluciones Clínicas
         </button>
+        <button
+          onClick={() => setActiveTab('consentimientos')}
+          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === 'consentimientos' 
+              ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+          }`}
+        >
+          <PenTool className="w-4 h-4" />
+          Consentimientos
+        </button>
       </div>
 
       {/* Content */}
@@ -132,95 +334,1131 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
               exit={{ opacity: 0 }}
               className="space-y-6 max-w-4xl"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800 pb-2">Patologías Sistémicas</h3>
-                  
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={anamnesis.hta} onChange={(e) => setAnamnesis({...anamnesis, hta: e.target.checked})} className="w-4 h-4 text-teal-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-teal-500 focus:ring-2" />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-teal-600 transition-colors">Hipertensión Arterial (HTA)</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={anamnesis.diabetes} onChange={(e) => {
-                      const checked = e.target.checked;
-                      setAnamnesis({
-                        ...anamnesis,
-                        diabetes: checked,
-                        diabetesStatus: checked ? (anamnesis.diabetesStatus === 'none' ? 'controlled' : anamnesis.diabetesStatus) : 'none'
-                      });
-                    }} className="w-4 h-4 text-teal-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-teal-500 focus:ring-2" />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-teal-600 transition-colors">Diabetes Mellitus</span>
-                  </label>
-
-                  {anamnesis.diabetes && (
-                    <div className="pl-7 pt-1 space-y-1 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-850">
-                      <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Estado y Control Glicémico (HbA1c):</label>
-                      <select 
-                        value={anamnesis.diabetesStatus || "controlled"} 
-                        onChange={(e) => setAnamnesis({...anamnesis, diabetesStatus: e.target.value as any})}
-                        className="w-full text-xs p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20"
-                      >
-                        <option value="controlled">Diabetes Controlada (HbA1c &lt; 7.0%)</option>
-                        <option value="severe">Diabetes Descompensada (HbA1c &ge; 7.0%)</option>
-                      </select>
-                      <span className="text-[9px] text-teal-600/70 dark:text-teal-400/70 block mt-0.5">Esto influye directamente en el grado de riesgo óseo del Periodontograma.</span>
-                    </div>
+              {/* SECCION 1: MOTIVO DE CONSULTA Y DOLOR */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                <ToggleHeader id="motivo" icon={FileText} title="Motivo de Consulta" description="Razón principal de la visita y evaluación del dolor actual" expandedSection={expandedSection} setExpandedSection={setExpandedSection} />
+                <AnimatePresence initial={false}>
+                  {expandedSection === 'motivo' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/40">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="md:col-span-2 space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Motivo Principal</label>
+                              <input 
+                                type="text" 
+                                placeholder="Ej. Dolor al morder, sangrado de encías, chequeo general" 
+                                value={anamnesis.motivoConsulta || ""} 
+                                onChange={(e) => setAnamnesis({...anamnesis, motivoConsulta: e.target.value})} 
+                                className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Historia del Motivo de Consulta</label>
+                              <textarea 
+                                rows={3} 
+                                placeholder="Evolución del problema, cuándo inició, cómo se ha tratado antes..." 
+                                value={anamnesis.historiaMotivoConsulta || ""} 
+                                onChange={(e) => setAnamnesis({...anamnesis, historiaMotivoConsulta: e.target.value})} 
+                                className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20 resize-y" 
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nivel de Dolor Actual</label>
+                              <select 
+                                value={anamnesis.dolorActual} 
+                                onChange={(e) => setAnamnesis({...anamnesis, dolorActual: e.target.value as any})} 
+                                className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20"
+                              >
+                                <option value="ninguno">Ninguno (Control/Rutina)</option>
+                                <option value="leve">Leve / Ocasional</option>
+                                <option value="pulsatil">Pulsátil / Constante</option>
+                                <option value="agudo">Agudo / Insoportable</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
                   )}
-                  
-                  <div className="pt-2">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tabaquismo (Cigarrillos / día)</label>
-                    <input type="number" min="0" value={anamnesis.tabaquismo} onChange={(e) => setAnamnesis({...anamnesis, tabaquismo: parseInt(e.target.value) || 0})} className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20" />
-                  </div>
-
-                  <div className="pt-2">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Edad Simulada para Análisis PRA (Años)</label>
-                    <input type="number" min="18" max="95" placeholder="P. ej., 45" value={anamnesis.edadSimulada || ""} onChange={(e) => setAnamnesis({...anamnesis, edadSimulada: parseInt(e.target.value) || undefined})} className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20" />
-                    <span className="text-[9px] text-slate-400 block mt-1">Si se deja vacío, se calculará automáticamente según su fecha de nacimiento registrada.</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800 pb-2">Datos Clínicos Específicos</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Alergias Conocidas</label>
-                    <textarea 
-                      value={anamnesis.alergias} 
-                      onChange={(e) => setAnamnesis({...anamnesis, alergias: e.target.value})} 
-                      placeholder="Ej. Penicilina, AINES, Látex..."
-                      rows={2}
-                      className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20" 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Motivo de Consulta (Dolor Actual)</label>
-                    <select 
-                      value={anamnesis.dolorActual} 
-                      onChange={(e) => setAnamnesis({...anamnesis, dolorActual: e.target.value as any})} 
-                      className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20"
-                    >
-                      <option value="ninguno">Ninguno (Control/Rutina)</option>
-                      <option value="leve">Leve / Ocasional</option>
-                      <option value="pulsatil">Pulsátil / Constante</option>
-                      <option value="agudo">Agudo / Insoportable</option>
-                    </select>
-                  </div>
-                </div>
+                </AnimatePresence>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800 pb-2">Notas Médicas y Otros Antecedentes Fisiológicos</h3>
-                <div>
-                  <textarea 
-                    value={anamnesis.notasSistemicas} 
-                    onChange={(e) => setAnamnesis({...anamnesis, notasSistemicas: e.target.value})} 
-                    placeholder="Otros detalles sistémicos, embarazo, uso de anticoagulantes, bisfofonatos..."
-                    rows={4}
-                    className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20" 
-                  />
-                </div>
+              {/* SECCION 2: SISTEMICO */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                <ToggleHeader id="sistemico" icon={HeartPulse} title="Antecedentes Sistémicos y Alergias" description="Hipertensión, diabetes, tabaquismo y alergias conocidas" expandedSection={expandedSection} setExpandedSection={setExpandedSection} />
+                <AnimatePresence initial={false}>
+                  {expandedSection === 'sistemico' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/40">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                              <input type="checkbox" checked={anamnesis.hta} onChange={(e) => setAnamnesis({...anamnesis, hta: e.target.checked})} className="w-4 h-4 text-teal-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-teal-500 focus:ring-2" />
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-teal-600 transition-colors">Hipertensión Arterial (HTA)</span>
+                            </label>
+
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                              <input type="checkbox" checked={anamnesis.diabetes} onChange={(e) => {
+                                const checked = e.target.checked;
+                                setAnamnesis({
+                                  ...anamnesis,
+                                  diabetes: checked,
+                                  diabetesStatus: checked ? (anamnesis.diabetesStatus === 'none' ? 'controlled' : anamnesis.diabetesStatus) : 'none'
+                                });
+                              }} className="w-4 h-4 text-teal-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-teal-500 focus:ring-2" />
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-teal-600 transition-colors">Diabetes Mellitus</span>
+                            </label>
+
+                            {anamnesis.diabetes && (
+                              <div className="pl-7 pt-1 space-y-1 bg-white dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-200 dark:border-slate-850">
+                                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Estado y Control Glicémico (HbA1c):</label>
+                                <select 
+                                  value={anamnesis.diabetesStatus || "controlled"} 
+                                  onChange={(e) => setAnamnesis({...anamnesis, diabetesStatus: e.target.value as any})}
+                                  className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20"
+                                >
+                                  <option value="controlled">Diabetes Controlada (HbA1c &lt; 7.0%)</option>
+                                  <option value="severe">Diabetes Descompensada (HbA1c &ge; 7.0%)</option>
+                                </select>
+                                <span className="text-[9px] text-teal-600/70 dark:text-teal-400/70 block mt-0.5">Esto influye directamente en el grado de riesgo óseo del Periodontograma.</span>
+                              </div>
+                            )}
+                            
+                            <div className="pt-2">
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tabaquismo (Cigarrillos / día)</label>
+                              <input type="number" min="0" value={anamnesis.tabaquismo} onChange={(e) => setAnamnesis({...anamnesis, tabaquismo: parseInt(e.target.value) || 0})} className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20" />
+                            </div>
+
+                            <div className="pt-2">
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Edad Simulada para Análisis PRA (Años)</label>
+                              <input type="number" min="18" max="95" placeholder="P. ej., 45" value={anamnesis.edadSimulada || ""} onChange={(e) => setAnamnesis({...anamnesis, edadSimulada: parseInt(e.target.value) || undefined})} className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20" />
+                              <span className="text-[9px] text-slate-400 block mt-1">Si se deja vacío, se calculará automáticamente según su fecha de nacimiento registrada.</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Alergias Conocidas</label>
+                              <textarea 
+                                value={anamnesis.alergias} 
+                                onChange={(e) => setAnamnesis({...anamnesis, alergias: e.target.value})} 
+                                placeholder="Ej. Penicilina, AINES, Látex..."
+                                rows={3}
+                                className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Notas Médicas y Otros Antecedentes Fisiológicos</label>
+                              <textarea 
+                                value={anamnesis.notasSistemicas} 
+                                onChange={(e) => setAnamnesis({...anamnesis, notasSistemicas: e.target.value})} 
+                                placeholder="Otros detalles sistémicos, embarazo, uso de anticoagulantes, bisfofonatos..."
+                                rows={4}
+                                className="w-full text-sm p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20 resize-y" 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Cuestionario Clínico Especializado de Dental */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                <ToggleHeader 
+                  id="especializacion" 
+                  icon={ShieldAlert} 
+                  title="Historial Clínico Especializado" 
+                  description="Cuestionario específico según la especialidad dental" 
+                  expandedSection={expandedSection} 
+                  setExpandedSection={setExpandedSection} 
+                  rightElement={
+                    <select
+                      value={activeSpecialty}
+                      onChange={(e) => setActiveSpecialty(e.target.value)}
+                      className="text-xs p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-teal-600 dark:text-teal-400 outline-none cursor-pointer focus:ring-2 focus:ring-teal-500/20"
+                    >
+                      <option value="periodoncia">📊 Periodoncia</option>
+                      <option value="endodoncia">⚡ Endodoncia</option>
+                      <option value="ortodoncia">📐 Ortodoncia</option>
+                      <option value="cirugia">✂️ Cirugía</option>
+                      <option value="rehabilitacion">✨ Rehabilitación</option>
+                      <option value="odontopediatria">👶 Odontopediatría</option>
+                    </select>
+                  }
+                />
+                
+                <AnimatePresence initial={false}>
+                  {expandedSection === 'especializacion' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/40">
+                  {/* Render Periodoncia Specific History */}
+                  {activeSpecialty === "periodoncia" && (
+                    <div className="space-y-6 animate-fade-in animate-duration-205">
+                      <div className="flex items-center gap-2 text-xs font-black text-teal-600 dark:text-teal-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <Activity className="w-4 h-4" /> Periodoncia, Soporte Óseo & Salud Gingival Avanzada
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                        {/* CUESTIONARIO SUB-SECCIÓN 1: SÍNTOMAS DEL PACIENTE */}
+                        <div className="col-span-1 md:col-span-2">
+                          <h4 className="text-[10px] font-black uppercase text-teal-550 dark:text-teal-500 tracking-widest mb-1">1. Sintomatología Subjetiva</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">¿Sangrado gingival espontáneo o al cepillado?</label>
+                          <select
+                            value={specialtyData.perioBleeding || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioBleeding: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No reporta sangrado</option>
+                            <option value="leve">Leve (Ocasionalmente al cepillar)</option>
+                            <option value="moderado">Moderado (Frecuente tras el cepillado)</option>
+                            <option value="severo">Severo (Sangrado espontáneo o nocturno)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">¿Ha notado movilidad u holgura en sus dientes?</label>
+                          <select
+                            value={specialtyData.perioMobilitySelf || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioMobilitySelf: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No, dientes firmes</option>
+                            <option value="ligera">Ligera en ciertas piezas</option>
+                            <option value="moderada">Movilidad moderada de soporte</option>
+                            <option value="severa">Movilidad severa pronunciada</option>
+                          </select>
+                        </div>
+
+                        {/* CUESTIONARIO SUB-SECCIÓN 2: EXAMEN CLÍNICO PERIODONTAL */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-teal-550 dark:text-teal-500 tracking-widest mb-1">2. Examen Físico e Historial Clínico</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Color y Aspecto Gingival Predominante:</label>
+                          <select
+                            value={specialtyData.perioGingivalColor || "rosa"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioGingivalColor: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="rosa">Rosa pálido / Textura puntillada (Sano)</option>
+                            <option value="rojo">Rojo eritematoso / Edematoso (Inflamación activa)</option>
+                            <option value="azul">Azul cianótico / Isquémico (Enfermedad crónica avanzada)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Presencia de Supuración / Exudado Purulento:</label>
+                          <select
+                            value={specialtyData.perioSuppuration || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioSuppuration: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">Ausente (Sin exudado)</option>
+                            <option value="si">Presente al sondado o presión digital ligera</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Pérdida Ósea Radiográfica Observada:</label>
+                          <select
+                            value={specialtyData.perioBoneLoss || "ninguna"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioBoneLoss: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="ninguna">Ninguna pérdida visible (Cresta intacta)</option>
+                            <option value="horizontal_leve">Horizontal Leve (&lt;15% o Tercio Apical intacto)</option>
+                            <option value="horizontal_mod">Horizontal Moderada (15% a 33%)</option>
+                            <option value="horizontal_sev">Horizontal Severa / Crítica (&gt;33%)</option>
+                            <option value="vertical">Defectos Angulares / Pérdida ósea vertical compleja</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Involucramiento de Furca (Dientes Multirradiculares):</label>
+                          <select
+                            value={specialtyData.perioFurca || "grado_0"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioFurca: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="grado_0">Sin lesión de furca (Grado 0)</option>
+                            <option value="grado_1">Grado I (Pérdida horizontal &le; 3mm debajo de la corona)</option>
+                            <option value="grado_2">Grado II (Pérdida horizontal &gt; 3mm sin atravesar)</option>
+                            <option value="grado_3">Grado III (Pérdida total túnel de lado a lado)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Presencia de Cálculo / Sarro Acumulado:</label>
+                          <select
+                            value={specialtyData.perioCalculus || "leve"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioCalculus: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="ninguno">Ninguno visible o detectable</option>
+                            <option value="leve">Leve (Supragingival lingual/vestibular anterior)</option>
+                            <option value="moderado">Moderado (Puentes de cálculo o subgingival incipiente)</option>
+                            <option value="abundante">Subgingival Abundante y Generalizado</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Última profilaxis / limpieza profesional:</label>
+                          <select
+                            value={specialtyData.perioCleanTime || "6_a_12_meses"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioCleanTime: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="menos_6_meses">Hace menos de 6 meses</option>
+                            <option value="6_a_12_meses">6 a 12 meses atrás</option>
+                            <option value="mas_12_meses">Más de 12 meses atrás / Nunca</option>
+                          </select>
+                        </div>
+
+                        {/* CUESTIONARIO SUB-SECCIÓN 3: FACTORES HIGIENE */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-teal-550 dark:text-teal-500 tracking-widest mb-1">3. Protocolos de Higiene & Factores de Riesgo</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Halitosis clínicamente detectable:</label>
+                          <select
+                            value={specialtyData.perioHalitosis || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioHalitosis: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No reportado / Ausente</option>
+                            <option value="ocasional">Ocasional declarada por el paciente</option>
+                            <option value="persistente">Persistente con origen respiratorio u oral detectable</option>
+                          </select>
+                        </div>
+                        <div className="space-y-3 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.perioFamilyLoss || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, perioFamilyLoss: e.target.checked })}
+                              className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                            />
+                            Antecedente familiar directo de pérdida dental por Periodontitis
+                          </label>
+                        </div>
+                        
+                        <div className="col-span-1 md:col-span-2 space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Implementos de higiene adicionales (Hilo dental, cepillo interproximal, irrigador):</label>
+                          <textarea
+                            value={specialtyData.perioHygieneTools || ""}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, perioHygieneTools: e.target.value })}
+                            placeholder="Ej: Cepillo interproximal marca TePe de 0.6mm tres veces al día, pasta GUM..."
+                            rows={2}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-201 dark:border-slate-750 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/15"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Render Endodoncia Specific History */}
+                  {activeSpecialty === "endodoncia" && (
+                    <div className="space-y-6 animate-fade-in animate-duration-205">
+                      <div className="flex items-center gap-2 text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <Zap className="w-4 h-4" /> Endodoncia, Diagnóstico Pulpar & Pruebas Fisiológicas
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                        {/* SECCIÓN 1: EXAMEN SINTOMÁTICO */}
+                        <div className="col-span-1 md:col-span-2">
+                          <h4 className="text-[10px] font-black uppercase text-amber-550 dark:text-amber-500 tracking-widest mb-1">1. Sintomatología y Estímulos Térmicos</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">¿Dolor provocado por cambios térmicos (Frío / Calor)?</label>
+                          <select
+                            value={specialtyData.endoThermalPain || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoThermalPain: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">Sin dolor al frío/calor</option>
+                            <option value="transitorio">Leve (Desaparece de inmediato)</option>
+                            <option value="persistente">Persistente (Dolor severo prolongado por minutos)</option>
+                            <option value="espontaneo">Espontáneo (Comienza sin estímulo alguno)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Localización del Dolor reportado:</label>
+                          <select
+                            value={specialtyData.endoPainType || "localizado"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoPainType: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="localizado">Localizado (El paciente señala la pieza exacta)</option>
+                            <option value="radiado">Irradiado o Difuso (Se esparce a la mandíbula o maxilar)</option>
+                            <option value="referido">Referido (Dolor de origen neurológico / muscular o sinusitis)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">¿Dolor o molestia al masticar / percusión?</label>
+                          <select
+                            value={specialtyData.endoBitePain || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoBitePain: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">Sin dolor al morder</option>
+                            <option value="leve">Sensibilidad o molestia ocasional</option>
+                            <option value="severo">Dolor severo opresivo al tacto/masticar</option>
+                          </select>
+                        </div>
+                        
+                        {/* SECCIÓN 2: EXAMEN FÍSICO PULPAR */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-amber-550 dark:text-amber-500 tracking-widest mb-1">2. Pruebas Diagnósticas Pulpares y Periapicales</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Prueba de Percusión Clínica Directa:</label>
+                          <select
+                            value={specialtyData.endoPercussion || "negativo"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoPercussion: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="negativo">Negativo (Respuesta sana estándar)</option>
+                            <option value="v_positivo">Percusión Vertical Altamente Positiva (Compromiso periodontal apical apical)</option>
+                            <option value="h_positivo">Percusión Horizontal Positiva (Compromiso periodontal lateral)</option>
+                            <option value="ambos_positivo">Altamente positivo en vertical y horizontal</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Prueba de Vitalidad al Frío (Endo-Ice / Tetracloroetano):</label>
+                          <select
+                            value={specialtyData.endoPulparTest || "sana"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoPulparTest: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="sana">Respuesta Normal (Desaparece en 2-4 seg, Pulpa Sana)</option>
+                            <option value="hiperalgesia_rev">Dolor rápido transitorio (Pulpitis Reversible)</option>
+                            <option value="hiperalgesia_irrev">Dolor persistente por minutos (Pulpitis Irreversible)</option>
+                            <option value="necrosis">Muerte Pulpar / Sin Respuesta (Necrosis absoluta)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Palpación Apical de la zona vestibular:</label>
+                          <select
+                            value={specialtyData.endoPalpation || "indolora"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoPalpation: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="indolora">Indolora y plana (Tejidos normales)</option>
+                            <option value="sensible">Sensible (Inflamación ósea periapical inminente)</option>
+                            <option value="fluctuante">Zona fluctuante indurada o con inflamación (Absceso)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Hallazgo Radiográfico Periapical:</label>
+                          <select
+                            value={specialtyData.endoRadiography || "normal"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoRadiography: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="normal">Espacio del ligamento periodontal normal</option>
+                            <option value="ensanchado">Ensanchamiento evidente del ligamento periodontal (Apical)</option>
+                            <option value="radiolucidez">Radiolucidez circumscripta apical (Quiste / Periodontitis apical)</option>
+                            <option value="osteitis">Osteítis Condensante (Hueso esclerosado reactivo)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Restauraciones Previas en la Pieza:</label>
+                          <select
+                            value={specialtyData.endoPrevRestorations || "ninguna"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoPrevRestorations: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="ninguna">Ninguna (Estructura intacta o caries virgen)</option>
+                            <option value="resina_profunda">Resina o Amalgama profunda cercana a cámara pulpar</option>
+                            <option value="corona">Corona protésica completa</option>
+                            <option value="poste">Perno o Poste intrarradicular de metal/fibra</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 3: COMPROMISO FISIOLÓGICO */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-amber-550 dark:text-amber-500 tracking-widest mb-1">3. Estado Clínico y Traumatismos</h4>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.endoNightPain || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, endoNightPain: e.target.checked })}
+                              className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Presenta dolor punzante espontáneo nocturno (Pulpitis Aguda)?
+                          </label>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.endoSwelling || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, endoSwelling: e.target.checked })}
+                              className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Ha presentado inflamación extraoral, absceso o fístula recurrente?
+                          </label>
+                        </div>
+                        <div className="col-span-1 md:col-span-2 space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Antecedentes de traumatismos, golpes o fisuras dentales reportadas:</label>
+                          <input
+                            type="text"
+                            value={specialtyData.endoTraumaTime || ""}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, endoTraumaTime: e.target.value })}
+                            placeholder="Ej. Caída hace 2 años con fractura coronaria de diente 11..."
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-805 border border-slate-201 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Render Ortodoncia Specific History */}
+                  {activeSpecialty === "ortodoncia" && (
+                    <div className="space-y-6 animate-fade-in animate-duration-205">
+                      <div className="flex items-center gap-2 text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <Layers className="w-4 h-4" /> Ortodoncia, Crecimiento, Relación Oclusión & Hábitos
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                        {/* SECCIÓN 1: PRINCIPAL ANGLE DENTAL */}
+                        <div className="col-span-1 md:col-span-2">
+                          <h4 className="text-[10px] font-black uppercase text-indigo-550 dark:text-indigo-500 tracking-widest mb-1">1. Diagnóstico Morfológico Dental y Esqueletal</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Clase de Relación Molar (Angle):</label>
+                          <select
+                            value={specialtyData.orthoDentalClass || "clase_1"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoDentalClass: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="clase_1">Clase I (Molar normal y oclusión balanceada)</option>
+                            <option value="clase_2_1">Clase II División 1 (Molar distalizado, incisivos salidos/proclina)</option>
+                            <option value="clase_2_2">Clase II División 2 (Molar distalizado, incisivos retroclinados)</option>
+                            <option value="clase_3">Clase III (Relación molar mesializada, mentón prominente)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Relación Esqueletal Sagital Estimada:</label>
+                          <select
+                            value={specialtyData.orthoSkeletalClass || "clase_1"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoSkeletalClass: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="clase_1">Clase I Esquelética (Armonía entre maxilar y mandíbula)</option>
+                            <option value="clase_2">Clase II Esquelética (Maxilar anterior o Mandíbula pequeña)</option>
+                            <option value="clase_3">Clase III Esquelética (Prognatismo mandibular o Retrognatismo maxilar)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Sobremordida Vertical (Overbite):</label>
+                          <select
+                            value={specialtyData.orthoOverbite || "normal"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoOverbite: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="normal">Normal (Incisivo superior cubre 20%-33% del inferior)</option>
+                            <option value="borde_a_borde">Borde a Borde (0% Cobertura)</option>
+                            <option value="abierta_anterior">Mordida Abierta Anterior (Ausencia de contacto/cobertura vertical)</option>
+                            <option value="profunda">Sobremordida Profunda / Cerrada (&gt;50% a 100% Cobertura)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Resalte Horizontal (Overjet):</label>
+                          <select
+                            value={specialtyData.orthoOverjet || "normal"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoOverjet: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="normal">Normal (1-2 mm de espacio horizontal)</option>
+                            <option value="aumentado">Excesivo / Resalte Aumentado (&gt;3mm a severo)</option>
+                            <option value="nulo">Mordida Cruzada Anterior (Incisivos superiores por detrás)</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 2: LÍNEA MEDIA Y AGENESIAS */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-indigo-550 dark:text-indigo-500 tracking-widest mb-1">2. Simetría de Líneas Medias y Anomalías</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Línea Media Dental Coincidente:</label>
+                          <select
+                            value={specialtyData.orthoMidline || "coincidente"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoMidline: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="coincidente">Sí, líneas media superior e inferior coinciden</option>
+                            <option value="der_sup">Desviación superior a la derecha</option>
+                            <option value="izq_sup">Desviación superior a la izquierda</option>
+                            <option value="der_inf">Desviación inferior a la derecha</option>
+                            <option value="izq_inf">Desviación inferior a la izquierda</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Diagnóstico Radiográfico de Agenesias/Dientes Retenidos:</label>
+                          <select
+                            value={specialtyData.orthoAgenesias || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoAgenesias: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">Sin agenesias o dientes supernumerarios retenidos</option>
+                            <option value="si_agenesia">Agenesia Dental detectada (Falta de gérmenes)</option>
+                            <option value="si_supernum">Diente Supernumerario (P.ej. Mesiodens en línea media)</option>
+                            <option value="retenido">Caninos o premolares retenidos en hueso</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 3: COMPROMISO Y HÁBITOS */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-indigo-550 dark:text-indigo-500 tracking-widest mb-1">3. Motivo, Patrón Respiratorio y Hábitos Orales</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Motivo estético de consulta principal:</label>
+                          <select
+                            value={specialtyData.orthoComplaint || "apiñamiento"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoComplaint: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="apiñamiento">Dientes apiñados/amontonados</option>
+                            <option value="diastemas">Espacios excesivos (Diastemas)</option>
+                            <option value="asimetria">Asimetría facial o dientes muy salidos</option>
+                            <option value="dolor">Problemas al cerrar la boca / ATM</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Tipo de patrón respiratorio:</label>
+                          <select
+                            value={specialtyData.orthoBreathing || "nasal"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoBreathing: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="nasal">Respiración Nasal pura (Fisiológica)</option>
+                            <option value="oral">Respiración Bucal (Hábito respirador bucal)</option>
+                            <option value="mixta">Respiración Mixta</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-755 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.orthoPrevTreat || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, orthoPrevTreat: e.target.checked })}
+                              className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Ha tenido tratamientos de ortodoncia o frenillos previos?
+                          </label>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-755 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.orthoAtmNoise || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, orthoAtmNoise: e.target.checked })}
+                              className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Presenta chasquidos, trabas o ruidos articulares (ATM)?
+                          </label>
+                        </div>
+                        <div className="col-span-1 md:col-span-2 space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Hábitos nocivos (Succión digital, deglución atípica, onicofagia, empuje lingual):</label>
+                          <input
+                            type="text"
+                            value={specialtyData.orthoHabits || ""}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, orthoHabits: e.target.value })}
+                            placeholder="Describa el hábito detectado o declarado por el paciente..."
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-805 border border-slate-201 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Render Cirugía Specific History */}
+                  {activeSpecialty === "cirugia" && (
+                    <div className="space-y-6 animate-fade-in animate-duration-205">
+                      <div className="flex items-center gap-2 text-xs font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <Scissors className="w-4 h-4" /> Cirugía Bucal-Maxilofacial, Coagulación, Apertura y Vías
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                        {/* SECCIÓN 1: HEMORRAGIA Y AGENTES BIOQUÍMICOS */}
+                        <div className="col-span-1 md:col-span-2">
+                          <h4 className="text-[10px] font-black uppercase text-rose-550 dark:text-rose-500 tracking-widest mb-1">1. Coagulación y Fármacos Parenterales</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Antecedentes personales de hemorragia anormal:</label>
+                          <select
+                            value={specialtyData.surgBleedingHistory || "ninguno"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgBleedingHistory: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="ninguno">Ninguno, coagulación normal</option>
+                            <option value="leve">Leve, curación un poco lenta</option>
+                            <option value="severo">Hemorragia prolongada tras cortes mínimos</option>
+                            <option value="coagulopatia">Coagulopatía declarada sistemáticamente</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Terapia anticoagulante / Bifosfonatos:</label>
+                          <select
+                            value={specialtyData.surgMedsAnticoag || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgMedsAnticoag: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No toma</option>
+                            <option value="aspirina">Aspirina diaria preventiva</option>
+                            <option value="anticoagulante_oral">Anticoagulantes orales permanentes</option>
+                            <option value="bifosfonatos">Bifosfonatos / Alendronato (Riesgo osteonecrosis)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Infección Odontogénica Activa:</label>
+                          <select
+                            value={specialtyData.surgInfectionScope || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgInfectionScope: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">Sin infección activa aguda</option>
+                            <option value="celulitis">Celulitis facial circunscrita/limitada</option>
+                            <option value="absceso">Infección fluctuante / Absceso alveolar purulento</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Tipo de Procedimiento Sugerido:</label>
+                          <select
+                            value={specialtyData.surgInterventionType || "exodoncia_simple"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgInterventionType: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="exodoncia_simple">Exodoncia Simple (Extracción regular)</option>
+                            <option value="tercer_molar">Exodoncia Quirúrgica de Terceros Molares Retenidos</option>
+                            <option value="implante">Colocación de Implante Dentario Intraóseo</option>
+                            <option value="frenectomia">Frenectomía (Labial u lingual bajo anestesia)</option>
+                            <option value="patologia_quiste">Eliminación de Quiste o Biopsia de tejido blando</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 2: EXAMEN DE VÍAS Y APERTURA */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-rose-550 dark:text-rose-500 tracking-widest mb-1">2. Examen de Vía Aérea, Tolerancia & Anestesia</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Apertura Bucal Máxima (Clínica):</label>
+                          <select
+                            value={specialtyData.surgMouthOpening || "normal"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgMouthOpening: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="normal">Normal (&ge; 40mm, fácil acceso)</option>
+                            <option value="restringido">Moderadamente Restringida (25-39mm)</option>
+                            <option value="severo_trismus">Trismus Severo o Espasmo (&lt; 25mm de apertura)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Valoración de Vía Aérea (Mallampati):</label>
+                          <select
+                            value={specialtyData.surgSystemicAirway || "clase_1"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgSystemicAirway: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="clase_1">Mallampati Clase I (Visibilidad total de úvula y fauces)</option>
+                            <option value="clase_2">Mallampati Clase II (Visibilidad de úvula parcial)</option>
+                            <option value="clase_3">Mallampati Clase III (Solo base de úvula visible)</option>
+                            <option value="clase_4">Mallampati Clase IV (Vía Aérea Dificultosa - Solo paladar blando)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Interconsulta Cardiológica Necesaria:</label>
+                          <select
+                            value={specialtyData.surgCardioConsent || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgCardioConsent: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No se requiere interconsulta</option>
+                            <option value="pendiente">Pendiente de emitir / enviar para HTA severa</option>
+                            <option value="autorizado_epi">Autorizado: Permite uso de Epinefrina regular (1:100,000)</option>
+                            <option value="autorizado_sin_epi">Autorizado: CON RESTRICCIÓN (Utilizar anestesia pura sin epinefrina)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-505 dark:text-slate-400">Disponibilidad de Altura y Espesor Óseo (Implantes):</label>
+                          <select
+                            value={specialtyData.surgBoneAvailability || "buena"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgBoneAvailability: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="buena">Excelente ósea (&ge;10mm altura y &ge;6mm espesor)</option>
+                            <option value="marginal">Marginal (Requiere regeneración ósea guiada concurrente)</option>
+                            <option value="severa_atrofia">Atrofia Severa (Requiere injerto de seno maxilar o bloque óseo previo)</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 3: ALERGIAS Y HERIDAS */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-rose-550 dark:text-rose-500 tracking-widest mb-1">3. Protocolos de Ansiedad & Historial Cicatriz</h4>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.surgKeloid || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, surgKeloid: e.target.checked })}
+                              className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Presenta tendencia a cicatrices Queloides?
+                          </label>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.surgSedationNeed || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, surgSedationNeed: e.target.checked })}
+                              className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Requiere protocolo de Sedación / ansiolisis por fobia?
+                          </label>
+                        </div>
+                        <div className="col-span-1 md:col-span-2 space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Alertas o problemas previos con anestesia local:</label>
+                          <input
+                            type="text"
+                            value={specialtyData.surgAnesthesiaWarning || ""}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, surgAnesthesiaWarning: e.target.value })}
+                            placeholder="Ej. Taquicardia severa con uso de epinefrina, alergias dudosas..."
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-805 border border-slate-210 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Render Rehabilitación Specific History */}
+                  {activeSpecialty === "rehabilitacion" && (
+                    <div className="space-y-6 animate-fade-in animate-duration-205">
+                      <div className="flex items-center gap-2 text-xs font-black text-purple-600 dark:text-purple-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <Sparkles className="w-4 h-4" /> Rehabilitación Oral, Oclusión Funcional & Estética Dentaria
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                        {/* SECCIÓN 1: OCLUSIÓN Y DESGASTE */}
+                        <div className="col-span-1 md:col-span-2">
+                          <h4 className="text-[10px] font-black uppercase text-purple-550 dark:text-purple-550 tracking-widest mb-1">1. Análisis Oclusal y Salud del Esmalte</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Esquema / Guía de Desoclusión:</label>
+                          <select
+                            value={specialtyData.rehabGuidance || "guia_canina"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabGuidance: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="guia_canina">Guía Canina bilateral balanceada (Fisiológica)</option>
+                            <option value="funcion_grupo">Función de Grupo (Completa / Parcial)</option>
+                            <option value="interferencia">Presencia de Interferencia en lado de balance</option>
+                            <option value="inestable">Oclusión céntrica inestable / Pérdida de dimensión</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Severidad de Desgaste (Atrisión / Bruxo-esmalte):</label>
+                          <select
+                            value={specialtyData.rehabEnamelWear || "grado_0"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabEnamelWear: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="grado_0">Sin desgaste evidente (Grado 0)</option>
+                            <option value="grado_1">Leve (Cúspides romas o facetas solo en esmalte superficial, Grado I)</option>
+                            <option value="grado_2">Moderado (Identaciones de dentina expuesta visibles, Grado II)</option>
+                            <option value="grado_3">Severo (Corona clínica muy disminuida / destructiva, Grado III)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Dimensión Vertical Oclusal (Proporción tercio inferior):</label>
+                          <select
+                            value={specialtyData.rehabFacialVibe || "conservado"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabFacialVibe: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="conservado">Conservado (Fisiología y estética proporcional)</option>
+                            <option value="disminuida">Disminuido (Colapso dental molar posterior bilateral)</option>
+                            <option value="aumentada">Aumentado por sobre-rehabilitación previa</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Hábitos de apretamiento (Bruxismo):</label>
+                          <select
+                            value={specialtyData.rehabBruxismType || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabBruxismType: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No reportado</option>
+                            <option value="nocturno">Apretamiento o rechinado nocturno</option>
+                            <option value="diurno">Bruxismo diurno / de tensión</option>
+                            <option value="severo">Bruxismo severo con desgaste facetario extenso</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 2: LÍNEAS DE SONRISA Y BIOTIPOS */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-purple-550 dark:text-purple-550 tracking-widest mb-1">2. Estética Dental y Parametría de Tejido Blando</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Línea de la Sonrisa del Paciente:</label>
+                          <select
+                            value={specialtyData.rehabSmileLine || "media"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabSmileLine: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="baja">Línea Baja (Incisivos totalmente cubiertos por labios al reír)</option>
+                            <option value="media">Línea Media (Muestra 75%-100% de corona y papila, Estética ideal)</option>
+                            <option value="alta">Línea Alta / Gingival (Muestra &ge;3mm de encía marginal continua)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Biotipo Periodontal Gingival:</label>
+                          <select
+                            value={specialtyData.rehabGingivalBiotype || "grueso"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabGingivalBiotype: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="grueso">Grueso y Festoneado (Alta resistencia, bajo riesgo regresivo)</option>
+                            <option value="fino">Fino y Delicado (Alto riesgo estético y de recesión al rehabilitar)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Sustrato / Material de Reconstitución Preferente:</label>
+                          <select
+                            value={specialtyData.rehabSubstructures || "disilicato"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabSubstructures: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="disilicato">E-Max / Disilicato de Litio (Máxima estética traslúcida)</option>
+                            <option value="circonio">Circonio Monolítico Multicapa (Alta dureza, para posteriores)</option>
+                            <option value="metal_porcelana">Metal-Porcelana Clásica (Económica estructural)</option>
+                            <option value="composite_ind">Inlays / Onlays de resina indirecta</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Tiempo transcurrido desde la pérdida del o los dientes:</label>
+                          <select
+                            value={specialtyData.rehabMissingDuration || "no_perdid"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabMissingDuration: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no_perdid">Cero pérdida de dientes</option>
+                            <option value="reciente">Pérdida reciente (Menos de un año)</option>
+                            <option value="prolongado">Pérdida prolongada con migración y atrofia ósea</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 3: PRÓTESIS ACTUAL Y ELEMENTOS */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-purple-550 dark:text-purple-555 tracking-widest mb-1">3. Prótesis Pasada y Expectativa General</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Sistemas de prótesis dental activos hoy:</label>
+                          <select
+                            value={specialtyData.rehabProsthesisCurrent || "ninguna"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabProsthesisCurrent: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="ninguna">Ninguna prótesis dental</option>
+                            <option value="removible">Prótesis Removible (Acrílico / Cromocobalto)</option>
+                            <option value="puente_antiguo">Prótesis Fija antigua para re-tratamiento</option>
+                            <option value="protesis_total">Prótesis Total superior o inferior</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.rehabAtmPain || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, rehabAtmPain: e.target.checked })}
+                              className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Dolor o cansancio muscular craneofacial en mañanas?
+                          </label>
+                        </div>
+                        <div className="col-span-1 md:col-span-2 space-y-1">
+                          <label className="text-xs font-bold text-slate-550 dark:text-slate-400">Expectativas estéticas (color, carillas, re-habilitación):</label>
+                          <input
+                            type="text"
+                            value={specialtyData.rehabShadeExp || ""}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, rehabShadeExp: e.target.value })}
+                            placeholder="Ej. Desea carillas ultra blancas o prefiere coronas de aspecto natural..."
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-805 border border-slate-201 dark:border-slate-750 rounded-xl outline-none focus:ring-2 focus:ring-purple-500/10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Render Odontopediatría Specific History */}
+                  {activeSpecialty === "odontopediatria" && (
+                    <div className="space-y-6 animate-fade-in animate-duration-205">
+                      <div className="flex items-center gap-2 text-xs font-black text-sky-600 dark:text-sky-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <Baby className="w-4 h-4" /> Odontopediatría Integral Infantil, Motivación de Padres e Inmunización de Flúor
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                        {/* SECCIÓN 1: COMPORTAMIENTO FRANKL */}
+                        <div className="col-span-1 md:col-span-2">
+                          <h4 className="text-[10px] font-black uppercase text-sky-550 dark:text-sky-500 tracking-widest mb-1">1. Conducta del Menor y Etapa de Dentición</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Comportamiento del menor (Escala Frankl):</label>
+                          <select
+                            value={specialtyData.pedFranklClass || "cooperador"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedFranklClass: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="cooperador">Definitivamente Positiva (Frankl 4) - Excelente</option>
+                            <option value="aceptante">Positiva (Frankl 3) - Colabora levemente tímido</option>
+                            <option value="temeroso">Negativo (Frankl 2) - Cooperación tímida / llanto</option>
+                            <option value="negativo_severo">Definitivamente Negativa (Frankl 1) - Llanto fuerte / rechazo</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Fase de Dentición Clínica Activa:</label>
+                          <select
+                            value={specialtyData.pedDentitionPhase || "temporal"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedDentitionPhase: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="temporal">Dentición Temporal Pura (Dientes de leche deciduos completos)</option>
+                            <option value="mixta_temprana">Dentición Mixta Temprana (Erupción de primeros molares e incisivos)</option>
+                            <option value="mixta_tardia">Dentición Mixta Tardía (Recambio de caninos y premolares)</option>
+                            <option value="permanente_joven">Dentición Permanente Joven (12 a 18 años)</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 2: PREVENCIÓN Y FLÚOR */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-sky-550 dark:text-sky-500 tracking-widest mb-1">2. Terapias Preventivas y Barnices de Flúor</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Última Aplicación de Barniz de Flúor (Prof):</label>
+                          <select
+                            value={specialtyData.pedFluorideApp || "menos_6"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedFluorideApp: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="menos_6">Hace menos de 6 meses (Protocolo activo para alto riesgo)</option>
+                            <option value="mas_6">Hace más de 6 meses</option>
+                            <option value="nunca">Nunca ha recibido fluoración profesional en consultorio</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Estado de Sellantes en Fosas y Fisuras:</label>
+                          <select
+                            value={specialtyData.pedSealers || "ninguno"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedSealers: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="ninguno">No presenta sellantes / Requiere su colocación</option>
+                            <option value="buen_estado">Sí presenta (Todos adaptados y en buen estado)</option>
+                            <option value="filtrado">Presenta sellantes desastillados / filtrados con caries debajo</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Régimen de cepillado asistido:</label>
+                          <select
+                            value={specialtyData.pedBrushAssisted || "supervisado"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedBrushAssisted: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="hecho_padres">Cepillado hecho 100% por los padres</option>
+                            <option value="supervisado">El niño cepilla solo pero con repaso de padres</option>
+                            <option value="solitario">El menor cepilla solo sin supervisión</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Grado estimado de Motivación de Padres/Tutores:</label>
+                          <select
+                            value={specialtyData.pedParentMotiv || "alta"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedParentMotiv: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="alta">Muy Alta (Cumple citas, dieta adecuada y excelente cepillado)</option>
+                            <option value="moderada">Moderada (Problemas de agenda / técnica regular de higiene)</option>
+                            <option value="baja">Baja / Negligencia involuntaria (Solo trae al menor por dolor agudo)</option>
+                          </select>
+                        </div>
+
+                        {/* SECCIÓN 3: ALIMENTOS Y HISTORIAL DE GOLPES */}
+                        <div className="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <h4 className="text-[10px] font-black uppercase text-sky-550 dark:text-sky-500 tracking-widest mb-1">3. Dieta, Hábitos Nocturnos y Traumatismo</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Es su primera visita odontológica general:</label>
+                          <select
+                            value={specialtyData.pedFirstVisit || "no_exito"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedFirstVisit: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="primera">Sí, es la primera consulta odontológica del niño</option>
+                            <option value="no_exito">No, tiene visitas anteriores totalmente exitosas</option>
+                            <option value="traumatica">No, ha tenido visitas anteriores conflictivas / dolorosas</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Consumo diario de alimentos azucarados:</label>
+                          <select
+                            value={specialtyData.pedSweets || "moderado"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedSweets: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="bajo">Muy bajo, restringido por tutores</option>
+                            <option value="moderado">Moderado entre comidas regulado</option>
+                            <option value="alto">Alto diario (Golosinas, jugos artificiales)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Antecedentes de traumatismos por caída infantil con compromiso dental:</label>
+                          <select
+                            value={specialtyData.pedTraumaHistory || "no"}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedTraumaHistory: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-201 dark:border-slate-700 rounded-xl font-medium outline-none focus:ring-2 focus:ring-teal-500/10"
+                          >
+                            <option value="no">No reporta golpes o caídas maxilares</option>
+                            <option value="luxacion">Sí, golpe frontal con luxación o fractura en diente deciduo</option>
+                            <option value="avulsion">Sí, intrusión o avulsión decidua (En vigilancia ósea)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-555 dark:text-slate-400">Frecuencia Cepillado Diario:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="5"
+                            value={specialtyData.pedFluoride || 2}
+                            onChange={(e) => setSpecialtyData({ ...specialtyData, pedFluoride: parseInt(e.target.value) || 0 })}
+                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-101 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/10[disabled:opacity-80]"
+                          />
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-705 dark:text-slate-300 font-bold cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={specialtyData.pedBottleNight || false}
+                              onChange={(e) => setSpecialtyData({ ...specialtyData, pedBottleNight: e.target.checked })}
+                              className="rounded text-sky-600 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                            />
+                            ¿Toma biberón nocturno con endulzantes o leche (Riesgo Caries de Biberón)?
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               
               <div className="pt-4 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/10 p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
@@ -337,6 +1575,215 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
                    </div>
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'consentimientos' && (
+            <motion.div
+              key="consentimientos"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {/* Form panel optimized for small viewports */}
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-4">
+                 <div className="space-y-2">
+                   <h3 className="font-bold text-slate-800 dark:text-slate-150 text-sm flex items-center gap-2">
+                     <ShieldAlert className="w-4 h-4 text-amber-500" />
+                     Emitir Consentimiento Informado
+                   </h3>
+                   <p className="text-xs text-slate-450 dark:text-slate-400">
+                     Seleccione la categoría médica regulada del procedimiento dental. Los pacientes podrán firmar directamente en pantalla táctil de celular o tablet.
+                   </p>
+                 </div>
+                 
+                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                   <select 
+                     value={newConsentType}
+                     onChange={(e) => setNewConsentType(e.target.value)}
+                     className="w-full sm:max-w-xs text-sm p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20 text-slate-700 dark:text-slate-200 font-medium"
+                   >
+                      <option value="Consentimiento General Quirúrgico">Consentimiento Quirúrgico (Implantes/Extracciones)</option>
+                      <option value="Consentimiento Periodontal">Tratamiento Periodontal Básico y Avanzado</option>
+                      <option value="Consentimiento Endodoncia">Riesgos y pronóstico de Endodoncia</option>
+                   </select>
+
+                   <button
+                     onClick={handleAddConsentimiento}
+                     className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-xs cursor-pointer shadow-sm active:scale-98"
+                   >
+                     <Plus className="w-4 h-4" /> Generar Documento
+                   </button>
+                 </div>
+              </div>
+
+              {/* List block */}
+              <div className="space-y-3">
+                 {consentimientos.map(cons => (
+                   <div key={cons.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5 transition-all">
+                     <div className="flex-1 space-y-2">
+                       <div className="flex items-center gap-2 flex-wrap">
+                         <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-md">
+                           {new Date(cons.date).toLocaleDateString()}
+                         </span>
+                         {cons.signature ? (
+                           <span className="text-[10px] items-center gap-1 font-bold bg-emerald-50 dark:bg-emerald-950/35 text-emerald-600 dark:text-emerald-450 px-2.5 py-1 rounded-md inline-flex border border-emerald-100 dark:border-emerald-900/30">
+                             <Check className="w-3 h-3" /> Firmado y Aceptado
+                           </span>
+                         ) : (
+                           <span className="text-[10px] items-center gap-1 font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-500 px-2.5 py-1 rounded-md inline-flex border border-amber-100 dark:border-amber-900/20">
+                             Pendiente de Firma
+                           </span>
+                         )}
+                       </div>
+                       
+                       <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 leading-tight">
+                         {cons.documentType}
+                       </h4>
+
+                       {/* Interactive Render of drawn base64 Signature inside the document card! */}
+                       {cons.signature && (
+                         <div className="mt-3 p-2.5 bg-slate-50 dark:bg-slate-900/70 border border-slate-101 dark:border-slate-800 rounded-xl inline-block">
+                           <p className="text-[9px] uppercase font-bold text-slate-450 mb-1">Firma Digital del Paciente</p>
+                           <img 
+                             src={cons.signature} 
+                             alt="Firma del Paciente" 
+                             className="h-10 md:h-12 w-auto object-contain dark:brightness-125 select-none"
+                             referrerPolicy="no-referrer"
+                           />
+                         </div>
+                       )}
+                     </div>
+                     
+                     <div className="flex items-center gap-2.5 justify-end md:self-center">
+                       {!cons.signature && (
+                         <button 
+                           onClick={() => handleSignConsentimiento(cons.id)}
+                           className="flex-1 md:flex-initial bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 md:py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]"
+                         >
+                            <PenTool className="w-3.5 h-3.5" /> Firmar en Pantalla
+                         </button>
+                       )}
+                       <button 
+                         onClick={() => handleDeleteConsentimiento(cons.id)}
+                         className="bg-slate-50 dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-450 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 p-3 md:p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                         title="Eliminar documento"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+                     </div>
+                   </div>
+                 ))}
+                 
+                 {consentimientos.length === 0 && (
+                   <div className="text-center py-12 bg-white dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                      <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-455">Sin Consentimientos Informados</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Genere y capture las firmas asistidas de los tratamientos desde este panel.</p>
+                   </div>
+                 )}
+              </div>
+
+              {/* FULL-SCREEN / TOUCH-FRIENDLY SIGNATURE DRAWER MODAL */}
+              <AnimatePresence>
+                {signingId && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-slate-900/80 dark:bg-slate-950/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 md:p-4"
+                  >
+                    <motion.div 
+                      initial={{ y: 50, scale: 0.95 }}
+                      animate={{ y: 0, scale: 1 }}
+                      exit={{ y: 50, scale: 0.95 }}
+                      className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] overflow-hidden"
+                    >
+                      {/* Modal Header */}
+                      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/10">
+                        <div className="flex items-center gap-2">
+                          <PenTool className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                          <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm md:text-base">
+                            Firma de Consentimiento
+                          </h4>
+                        </div>
+                        <button 
+                          onClick={() => setSigningId(null)}
+                          className="p-1 rounded-lg text-slate-450 hover:bg-slate-101 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Modal Body / Scrollable medical terms */}
+                      <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                        <div className="space-y-1">
+                          <p className="text-[10px] uppercase font-bold text-teal-600 dark:text-teal-400 tracking-wider">Documento</p>
+                          <h5 className="font-black text-slate-900 dark:text-white text-base leading-tight">
+                            {consentimientos.find(c => c.id === signingId)?.documentType}
+                          </h5>
+                        </div>
+
+                        {/* Text template block */}
+                        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-150 dark:border-slate-800/80 max-h-48 md:max-h-60 overflow-y-auto text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-normal whitespace-pre-wrap select-none scrollbar-thin">
+                          {signingId && CONSENT_TEXTS[consentimientos.find(c => c.id === signingId)?.documentType || ''] || 'No hay texto predefinido.'}
+                        </div>
+
+                        <div className="space-y-2 pt-2">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] uppercase font-bold text-slate-450 dark:text-slate-500 tracking-wider">
+                              Dibuje su Firma en el Recuadro:
+                            </label>
+                            <button 
+                              onClick={clearCanvas}
+                              className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 flex items-center gap-1 cursor-pointer bg-transparent border-0"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Limpiar
+                            </button>
+                          </div>
+                          
+                          {/* DRAWING CANVAS */}
+                          <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                            <canvas 
+                              ref={canvasRef}
+                              width={500}
+                              height={250}
+                              onMouseDown={startDrawing}
+                              onMouseMove={draw}
+                              onMouseUp={stopDrawing}
+                              onMouseLeave={stopDrawing}
+                              onTouchStart={startDrawing}
+                              onTouchMove={draw}
+                              onTouchEnd={stopDrawing}
+                              className="w-full h-40 md:h-44 bg-slate-50 dark:bg-slate-955 block touch-none"
+                            />
+                            <div className="absolute bottom-2 right-2 pointer-events-none text-[9px] text-slate-400 font-medium bg-white/70 dark:bg-slate-905/70 px-2 py-0.5 rounded-lg border border-slate-200/40">
+                              Táctil / Ratón
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Modal Footer */}
+                      <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-955/10 flex gap-2.5 font-sans">
+                        <button 
+                          onClick={() => setSigningId(null)}
+                          className="flex-1 py-3 text-slate-600 dark:text-slate-350 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 font-bold rounded-xl text-xs transition-all active:scale-98 cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button 
+                          onClick={saveSignature}
+                          className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs transition-all active:scale-98 flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" /> Confirmar Firma
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 

@@ -22,7 +22,6 @@ import {
   Send,
   Stethoscope
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
 import { ClinicalUser, Appointment } from "../types";
 
 interface PatientPortalProps {
@@ -100,55 +99,26 @@ const CLINICIANS_DIRECTORY = [
   }
 ];
 
-const HEALTH_TIPS = [
-  {
-    title: "Mantenimiento Preventivo de Encias",
-    category: "Periodoncia",
-    readingTime: "3 min de lectura",
-    description: "El cepillado interdental diario reduce en un 87% el sangrado de las encías activa y previene la resorción ósea temprana.",
-    color: "from-teal-500 to-cyan-500",
-    icon: Heart
-  },
-  {
-    title: "Por qué sangran las encías al cepillarse",
-    category: "Gingivitis",
-    readingTime: "4 min de lectura",
-    description: "La inflamación periodontal es la respuesta inmune al biofilm dental. Acude a una limpieza ultrasónica profiláctica semestral.",
-    color: "from-emerald-500 to-teal-600",
-    icon: ShieldAlert
-  },
-  {
-    title: "Cuidado Avanzado de Implantes Dentales",
-    category: "Implantología",
-    readingTime: "5 min de lectura",
-    description: "Aprende cómo el enjuague de clorhexidina bajo supervisión clínica mantiene la osteointegración libre de mucositis periimplantaria.",
-    color: "from-blue-500 to-indigo-600",
-    icon: Sparkles
-  }
-];
-
 export default function PatientPortal({ 
   activeUser, 
   onLogout, 
-  darkMode, 
-  setDarkMode, 
   allAppointments, 
   onAddAppointment 
 }: PatientPortalProps) {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClinician, setSelectedClinician] = useState("");
-  const [selectedDate, setSelectedDate] = useState("2026-06-10");
+  const [selectedDate, setSelectedDate] = useState("2026-06-20");
   const [selectedTime, setSelectedTime] = useState("10:00");
-  const [selectedTreatment, setSelectedTreatment] = useState("Consulta de Diagnóstico y Plan");
+  const [selectedTreatment, setSelectedTreatment] = useState("Control Dental General");
   const [formSuccess, setFormSuccess] = useState(false);
   
   // Local active chat with Patient's personalized Assistant Dentito-Lite
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([
+  const [chatMessages, setChatMessages] = useState<Array<{role: "user" | "assistant", content: string}>>([
     {
       role: "assistant",
-      content: `¡Hola, ${activeUser.name}! Bienvenido a tu espacio de Paciente. Soy **Dentito IA**, tu copiloto virtual de salud oral. ¿Tienes alguna pregunta sobre tu tratamiento, dolor dental o cómo cuidar tus encías? Escríbeme y te guiaré con gusto.`
+      content: `¡Hola, ${activeUser.name}! Soy Dentito 😊, tu asistente virtual. Estoy aquí para ayudarte a agendar horas o resolver dudas sobre tu salud dental. ¿En qué te puedo ayudar hoy?`
     }
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -170,31 +140,27 @@ export default function PatientPortal({
   const myAppointments = allAppointments.filter(app => 
     app.patientName.toLowerCase() === activeUser.name.toLowerCase() ||
     app.patientId === "pat-client" ||
-    app.treatment.toLowerCase().includes("diagnóstico") && activeUser.profile === "cliente"
+    (app.treatment.toLowerCase().includes("diagnóstico") && activeUser.profile === "cliente")
   );
 
   const handleBookAppointment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClinician) return;
 
-    const matchedDoc = CLINICIANS_DIRECTORY.find(doc => doc.id === selectedClinician);
-    const doctorName = matchedDoc ? matchedDoc.name : "Dr. Especialista";
-
     const newApp: Appointment = {
       id: `app-client-${Date.now()}`,
-      patientId: "pat-client", // generic user-patient client indicator
+      patientId: "pat-client",
       patientName: activeUser.name,
       date: selectedDate,
       time: selectedTime,
-      treatment: `${selectedTreatment} - [Solicitado por Portal de Cliente]`,
-      status: "Pending", // Starts as pending approval
-      box: "Sillón 1" // Default placement representation
+      treatment: `${selectedTreatment} - [Agendado Online]`,
+      status: "Pending",
+      box: "Consulta General"
     };
 
     onAddAppointment(newApp);
     setFormSuccess(true);
     
-    // Clear success message after 4s
     setTimeout(() => {
       setFormSuccess(false);
     }, 4000);
@@ -206,10 +172,9 @@ export default function PatientPortal({
 
     const userMsg = chatInput.trim();
     setChatInput("");
-    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatMessages(prev => [...prev, { role: "user", content: userMsg }]);
     setIsChatLoading(true);
 
-    // Call server API for patient assistant
     try {
       const response = await fetch("/api/dentito", {
         method: "POST",
@@ -219,24 +184,23 @@ export default function PatientPortal({
             ...chatMessages.map(m => ({ role: m.role, content: m.content })),
             { role: "user", content: userMsg }
           ],
-          context: `Paciente: ${activeUser.name} (${activeUser.email}). Rol: Cliente/Paciente sin conocimientos odontológicos complejos. Habla con tono cálido, preventivo, motivacional y claro para un consumidor dental. Recomienda cepillado 3 veces al día, hilo dental, y acudir a la clínica si manifiesta dolor actual.`
+          context: `Paciente: ${activeUser.name}. Actúa súper amable y simple. Usa lenguaje coloquial y no médico. Recomienda cuidar su sonrisa.`
         })
       });
 
       const data = await response.json();
       if (data.text) {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+        setChatMessages(prev => [...prev, { role: "assistant", content: data.text }]);
       } else {
         throw new Error(data.error || "Ocurrió un error");
       }
     } catch (e) {
-      // Fallback
       setTimeout(() => {
         setChatMessages(prev => [
           ...prev, 
           { 
-            role: 'assistant', 
-            content: `**Dentito:** Disculpa, tengo una interferencia en mi señal satelital, pero recuerda siempre cepillarte usando la técnica de Bass modificada e hilo dental diariamente. Para agendar formalmente tu hora de control periodontal, utiliza el formulario de reserva ubicado al centro del portal.` 
+            role: "assistant", 
+            content: `Lo siento, mi conexión está un poco intermitente. Recuerda cepillarte los dientes siempre después de comer ✨. Si quieres pedir hora, usa el calendario aquí al ladito.` 
           }
         ]);
       }, 500);
@@ -246,43 +210,40 @@ export default function PatientPortal({
   };
 
   return (
-    <div className={`min-h-screen font-sans ${darkMode ? "dark bg-slate-950 text-white" : "bg-slate-50 text-slate-800"} pb-12`}>
-      {/* Background blobs for premium depth */}
-      {darkMode && (
-        <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
-          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-teal-950/20 blur-[130px] rounded-full" />
-          <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-emerald-950/10 blur-[140px] rounded-full" />
-        </div>
-      )}
+    <div className="min-h-screen font-sans bg-slate-50 text-slate-800 pb-12 relative overflow-hidden">
+      {/* Soft warm background gradients */}
+      <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden bg-gradient-to-b from-teal-50/50 to-white">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-teal-200/40 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-blue-200/30 blur-[130px] rounded-full" />
+      </div>
 
-      {/* Top Main Navigation for Clinical Patients */}
-      <header className="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b-2 border-teal-500/40 dark:border-teal-500/35 p-4 shadow-[0_4px_20px_rgba(20,184,166,0.15)]">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/50 px-6 py-4 shadow-sm">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Logo className="w-10 h-10" showNeon={true} />
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-teal-500/20">
+              <Sparkles className="w-6 h-6" />
+            </div>
             <div>
-              <h1 className="font-display font-bold text-base leading-none text-slate-900 dark:text-white mb-0.5">PerioDash</h1>
-              <span className="text-[11px] text-teal-600 dark:text-teal-400 font-black tracking-widest uppercase bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20 shadow-[0_0_8px_rgba(20,184,166,0.2)]">Paciente</span>
+              <h1 className="font-display font-black text-xl leading-none text-slate-800">Mi Sonrisa</h1>
+              <span className="text-[10px] text-teal-600 font-bold uppercase tracking-widest">Portal de Pacientes</span>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* User profile capsule info */}
-            <div className="hidden sm:flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
-              <div className="w-7 h-7 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs">
+            <div className="hidden sm:flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-sm">
                 {activeUser.name.charAt(0)}
               </div>
-              <div className="text-left">
-                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-none">{activeUser.name}</p>
-                <span className="text-[8.5px] font-semibold text-slate-400 uppercase tracking-wider">Paciente de Convenio</span>
+              <div className="text-left pr-2">
+                <p className="text-xs font-bold text-slate-800 leading-none">{activeUser.name}</p>
+                <span className="text-[10px] font-medium text-slate-500">Paciente VIP</span>
               </div>
             </div>
 
-            {/* Logout actions */}
             <button
               onClick={onLogout}
-              className="p-2.5 rounded-xl border border-red-200/55 dark:border-red-950/30 bg-red-50/50 dark:bg-red-950/20 text-red-650 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-950/40 cursor-pointer transition-all flex items-center gap-1.5 font-bold text-xs"
-              title="Cerrar sesión segura"
+              className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-red-500 cursor-pointer transition-all flex items-center gap-2 font-bold text-xs shadow-sm"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden md:inline">Salir</span>
@@ -291,457 +252,170 @@ export default function PatientPortal({
         </div>
       </header>
 
-      {/* Main Grid Patient Experience */}
-      <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
+      <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 lg:space-y-8 mt-4">
         
-        {/* Welcome greeting card with premium layout */}
-        <div className="bg-gradient-to-r from-teal-950/35 via-teal-900/20 to-slate-900/45 rounded-3xl border border-teal-500/45 p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden shadow-[0_0_20px_rgba(20,184,166,0.25)]">
-          <div className="space-y-2 max-w-2xl">
-            <span className="text-[10px] bg-teal-500/10 border border-teal-500/25 text-teal-600 dark:text-teal-400 font-extrabold uppercase px-3 py-1 rounded-full tracking-widest inline-flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Acceso Paciente Seguro
-            </span>
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-slate-900 dark:text-white tracking-tight">
-              ¡Hola, {activeUser.name}!
+        {/* Welcome Section */}
+        <div className="bg-white rounded-[2rem] border border-white shadow-xl shadow-slate-200/50 p-8 md:p-10 flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden group">
+          <div className="absolute right-0 top-0 w-64 h-64 bg-gradient-to-br from-teal-100/50 to-emerald-50/50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-700" />
+          
+          <div className="space-y-4 max-w-2xl text-center md:text-left relative z-10">
+            <h2 className="text-3xl md:text-4xl font-display font-black text-slate-800 tracking-tight">
+              ¡Qué bueno verte, <span className="text-teal-600">{activeUser.name}</span>! 👋
             </h2>
-            <p className="text-xs md:text-sm text-slate-400 leading-relaxed font-light">
-              Desde tu acceso de Paciente puedes buscar clínicas autorizadas PerioDash, coordinar nuevas consultas presenciales con los mejores especialistas de la región y revisar recomendaciones médicas en tiempo real.
+            <p className="text-sm md:text-base text-slate-500 leading-relaxed max-w-xl mx-auto md:mx-0">
+              Bienvenido a tu portal personal. Aquí puedes ver tus próximas citas, buscar un especialista o pedir consejos a nuestro asistente virtual Dentito. ¡Cuidar tu sonrisa nunca fue tan fácil!
             </p>
           </div>
           
-          <div className="bg-white/5 dark:bg-slate-900/50 backdrop-blur-md border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shrink-0 flex items-center gap-3 w-full md:w-auto">
-            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Tu Índice de Salud</p>
-              <h4 className="text-lg font-black text-slate-800 dark:text-white">Excelente (94%)</h4>
-              <p className="text-[9px] text-teal-500 leading-none font-semibold mt-0.5">Control periodontal al día</p>
+          <div className="flex gap-4 shrink-0">
+            <div className="bg-gradient-to-b from-teal-50 to-white border border-teal-100 p-5 rounded-2xl flex flex-col items-center justify-center text-center w-32 shadow-sm">
+              <Heart className="w-8 h-8 text-rose-400 mb-2 fill-rose-100" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tu Salud</span>
+              <h4 className="text-lg font-black text-slate-800">Excelente</h4>
             </div>
           </div>
         </div>
 
-        {/* CLINICAL METRICS CARD & TREATMENT TIMELINE */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3 bg-white dark:bg-slate-900/40 border-2 border-teal-500/20 dark:border-teal-500/25 rounded-3xl p-6 shadow-[0_0_15px_rgba(20,184,166,0.05)] relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-              <Activity className="w-40 h-40 text-teal-400" />
-            </div>
-            
-            <div className="flex justify-between items-start gap-4">
-              <div>
-                <span className="text-[9px] bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-widest leading-none flex items-center gap-1 w-max">
-                  <Activity className="w-3 h-3" /> Reporte Periodontal Automatizado
-                </span>
-                <h3 className="text-md font-display font-black text-slate-900 dark:text-white mt-2">Mediciones Clínicas Recientes</h3>
-                <p className="text-xs text-slate-400 font-medium">Sincronizado directamente desde tu odontograma y periodontograma clínico en consulta.</p>
-              </div>
-              <span className="text-[10px] text-teal-500 font-mono font-bold bg-teal-500/5 border border-teal-500/10 rounded px-2 py-0.5 shrink-0">
-                FDI Adulto 32p
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Biofilm O'Leary</span>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <h4 className="text-lg font-black text-emerald-500">12.5%</h4>
-                  <span className="text-[8px] font-bold text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded">Sano</span>
-                </div>
-                <p className="text-[8px] text-slate-450 mt-1 leading-none">Meta recomendada: &lt;20%</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Prof. Sondaje</span>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <h4 className="text-lg font-black text-teal-500">1.8 mm</h4>
-                  <span className="text-[8px] font-bold text-teal-500 bg-teal-500/10 px-1 py-0.2 rounded">Óptimo</span>
-                </div>
-                <p className="text-[8px] text-slate-450 mt-1 leading-none">Meta recomendada: &lt;3mm</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sangrado BOP</span>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <h4 className="text-lg font-black text-emerald-500">3.2%</h4>
-                  <span className="text-[8px] font-bold text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded">Leve</span>
-                </div>
-                <p className="text-[8px] text-slate-450 mt-1 leading-none">Meta recomendada: &lt;10%</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/80 rounded-2xl">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Soporte Alveolar</span>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <h4 className="text-lg font-black text-teal-500">95.4%</h4>
-                  <span className="text-[8px] font-bold text-teal-500 bg-teal-500/10 px-1 py-0.2 rounded">Excelente</span>
-                </div>
-                <p className="text-[8px] text-slate-450 mt-1 leading-none">Nivel óseo estable</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Treatment plan Progress Timeline */}
-          <div className="bg-white dark:bg-slate-900/40 border-2 border-cyan-500/20 dark:border-cyan-500/25 rounded-3xl p-6 shadow-[0_0_15px_rgba(6,182,212,0.05)] flex flex-col justify-between">
-            <div>
-              <span className="text-[9px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-widest leading-none flex items-center gap-1 w-max">
-                <FileCheck2 className="w-3 h-3" /> PLAN DE TRATAMIENTO
-              </span>
-              <h3 className="text-md font-display font-black text-slate-900 dark:text-white mt-2 leading-none">Tu Progreso</h3>
-            </div>
-
-            <div className="space-y-4 my-2 font-sans text-xs flex-grow justify-center flex flex-col">
-              <div className="flex items-start gap-2.5">
-                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 font-extrabold text-[9px]">✓</div>
-                <div>
-                  <p className="font-bold leading-tight text-slate-900 dark:text-white">Cureta Cuadrante</p>
-                  <span className="text-[9px] text-slate-450 block leading-none">Completado • Cuadrante IA</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 font-extrabold text-[9px]">✓</div>
-                <div>
-                  <p className="font-bold leading-tight text-slate-900 dark:text-white">Perfil O'Leary</p>
-                  <span className="text-[9px] text-slate-450 block leading-none">Completado • Biofilm 12.5%</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <div className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500 text-teal-400 flex items-center justify-center shrink-0 font-extrabold text-[9px]">●</div>
-                <div>
-                  <p className="font-bold leading-tight text-teal-400">Control Periodontal</p>
-                  <span className="text-[9px] text-teal-500 font-semibold block leading-none">Próxima sesión • 10:00 AM</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           
-          {/* LEFT PANEL: Directory Search, Clinical Tip, and Book form */}
-          <div className="lg:col-span-8 space-y-8">
+          {/* Main Content Area */}
+          <div className="lg:col-span-8 space-y-6 lg:space-y-8">
             
-            {/* 1. Clinicians Directory & Clinics Search Engine */}
-            <div className="bg-white dark:bg-slate-900/40 border-2 border-teal-500/30 dark:border-teal-500/30 rounded-3xl p-6 space-y-6 shadow-[0_0_22px_rgba(20,184,166,0.18)]">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-5">
-                <div>
-                  <h3 className="text-md font-display font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Search className="w-5 h-5 text-teal-500" />
-                    Buscar Profesionales y Clínicas Dentales
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">Encuentra disponibilidad y agenda de manera directa</p>
-                </div>
-
-                {/* Live directories search field */}
-                <div className="relative w-full md:w-72">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
-                    <Search className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Filtrar por especialidad o apellido..."
-                    className="w-full text-xs p-2.5 pl-9 rounded-xl outline-none border border-slate-200 dark:border-slate-800 dark:bg-slate-950 text-white focus:border-teal-500/40"
-                  />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-2.5 text-[10px] font-bold text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer"
-                    >
-                      Borrador
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Grid Clinicians Results */}
-              <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase text-teal-600 dark:text-teal-400 tracking-widest">Doctores Disponibles</h4>
-                
-                {filteredClinicians.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-3 text-center">No se encontraron especialistas con el término ingresado.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {filteredClinicians.map((doc) => (
-                      <div 
-                        key={doc.id}
-                        className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 flex flex-col justify-between hover:border-teal-500/30 transition-all group"
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between items-start">
-                            <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-xs border border-teal-500/10">
-                              {doc.avatar}
-                            </div>
-                            <div className="flex items-center gap-1 bg-amber-500/5 border border-amber-500/20 rounded px-1.5 py-0.5">
-                              <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                              <span className="text-[9.5px] font-bold text-amber-600 dark:text-amber-400">{doc.rating}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight group-hover:text-teal-550 dark:group-hover:text-teal-400 transition-colors">{doc.name}</h5>
-                            <p className="text-[10px] text-teal-500 font-semibold mt-1 leading-snug">{doc.specialty}</p>
-                          </div>
-                        </div>
-
-                        <div className="border-t border-slate-100 dark:border-slate-800/40 pt-2.5 mt-3 space-y-1.5 text-[10px] text-slate-400">
-                          <p className="truncate">🏢 {doc.clinic}</p>
-                          <p>📅 {doc.availability}</p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedClinician(doc.id);
-                            const el = document.getElementById("reserva-form");
-                            if (el) {
-                              el.scrollIntoView({ behavior: "smooth" });
-                              el.classList.add("ring-2", "ring-teal-500", "duration-500");
-                              setTimeout(() => el.classList.remove("ring-2", "ring-teal-500"), 2000);
-                            }
-                          }}
-                          className="mt-3 w-full py-2 bg-teal-500/10 hover:bg-teal-600 text-teal-600 dark:text-teal-400 dark:hover:text-white font-extrabold text-[10px] rounded-xl border border-teal-500/25 dark:border-teal-400/20 hover:border-teal-400 transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          Reservar Cita
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Grid Clinic branches Results */}
-              <div className="space-y-4 pt-2">
-                <h4 className="text-[10px] font-black uppercase text-teal-600 dark:text-teal-400 tracking-widest">Sedes de Clínicas Dentales</h4>
-                
-                {filteredClinics.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-3 text-center">No se encontraron clínicas asociadas con la búsqueda.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {filteredClinics.map((clinic) => (
-                      <div 
-                        key={clinic.id}
-                        className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/10 overflow-hidden flex flex-col justify-between hover:border-teal-500/30 transition-all"
-                      >
-                        <div className="h-28 overflow-hidden relative">
-                          <img 
-                            src={clinic.image} 
-                            alt={clinic.name} 
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                          />
-                          <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-xs text-[9px] text-white font-bold px-2 py-0.5 rounded flex items-center gap-1">
-                            <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                            {clinic.rating} ({clinic.reviews} reviews)
-                          </div>
-                        </div>
-
-                        <div className="p-4 space-y-3">
-                          <div>
-                            <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{clinic.name}</h5>
-                            <p className="text-[10px] text-slate-400 mt-1 block h-8 line-clamp-2 leading-snug">📍 {clinic.address}</p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-1">
-                            {clinic.specialties.map((spec) => (
-                              <span 
-                                key={spec} 
-                                className="text-[8px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-md px-1.5 py-0.5"
-                              >
-                                {spec}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 2. CLINICAL APPOINTMENT REQUEST FORM */}
-            <div id="reserva-form" className="bg-white dark:bg-slate-900/40 border-2 border-cyan-500/35 dark:border-cyan-500/30 rounded-3xl p-6 space-y-6 shadow-[0_0_22px_rgba(6,182,212,0.18)] transition-all">
-              <div>
-                <h3 className="text-md font-display font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-teal-500" />
-                  Agendar Nueva Cita Quirúrgica / Control
+            {/* BOOKING SECTION */}
+            <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
+              <div className="mb-6">
+                <h3 className="text-xl font-display font-black text-slate-800 flex items-center gap-3">
+                  <Calendar className="w-6 h-6 text-teal-500 bg-teal-50 p-1 rounded-lg" />
+                  Agendar una nueva cita
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">Completa los parámetros médicos solicitados. La clínica autorizará la hora a la brevedad.</p>
+                <p className="text-sm text-slate-500 mt-1">Elige a tu especialista y un horario que te acomode.</p>
               </div>
 
               {formSuccess && (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs rounded-xl flex items-start gap-2.5">
-                  <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 animate-bounce" />
+                <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm rounded-2xl flex items-start gap-3 shadow-sm">
+                  <CheckCircle className="w-5 h-5 shrink-0 text-emerald-500" />
                   <div>
-                    <strong className="font-bold block uppercase text-[10px] tracking-wider mb-0.5">¡Solicitud Procesada Correctamente!</strong>
-                    La cita ha sido recibida en el módulo del odontólogo en estado *Pendiente*. Se enviará un SMS e email automático.
+                    <strong className="font-bold block">¡Reserva enviada con éxito!</strong>
+                    Pronto nos comunicaremos contigo para confirmar los detalles.
                   </div>
                 </div>
               )}
 
-              <form onSubmit={handleBookAppointment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block font-sans">Especialista Requerido</label>
+              <form onSubmit={handleBookAppointment} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">¿Con quién te gustaría atenderte?</label>
                   <select
                     value={selectedClinician}
                     onChange={(e) => setSelectedClinician(e.target.value)}
-                    className="w-full text-xs p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none dark:text-white focus:border-teal-500/40"
+                    className="w-full text-sm p-4 bg-slate-50/50 border border-slate-200 rounded-2xl outline-none text-slate-700 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-medium"
                     required
                   >
-                    <option value="">Seleccione el odontólogo...</option>
+                    <option value="">Selecciona un doctor...</option>
                     {CLINICIANS_DIRECTORY.map(doc => (
-                      <option key={doc.id} value={doc.id}>{doc.name} - ({doc.clinic})</option>
+                      <option key={doc.id} value={doc.id}>{doc.name} - {doc.specialty}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block font-sans">Tratamiento de Interés</label>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">¿Qué necesitas?</label>
                   <select
                     value={selectedTreatment}
                     onChange={(e) => setSelectedTreatment(e.target.value)}
-                    className="w-full text-xs p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none dark:text-white focus:border-teal-500/40"
+                    className="w-full text-sm p-4 bg-slate-50/50 border border-slate-200 rounded-2xl outline-none text-slate-700 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-medium"
                   >
-                    <option value="Consulta de Diagnóstico y Plan">Control Periodontal Profiláctico</option>
-                    <option value="Sondaje Periodontal Completo">Sondaje Periodontal Estructurado 6 puntos</option>
-                    <option value="Raspado y Alisado Radicular">Raspado y Alisado Radicular (Curetaje)</option>
-                    <option value="Diseño Estético e Implantes">Evaluación de Implante / Corona Dental</option>
+                    <option value="Control Dental General">Revisión General / Presupuesto</option>
+                    <option value="Limpieza Dental">Limpieza Dental</option>
+                    <option value="Blanqueamiento">Blanqueamiento Dental</option>
+                    <option value="Evaluación Ortodoncia">Evaluación para Frenillos</option>
+                    <option value="Urgencia / Dolor">Urgencia / Tengo dolor</option>
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block font-sans">Fecha Solicitada</label>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">¿Qué día prefieres?</label>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none dark:text-white focus:border-teal-500/40"
+                    className="w-full text-sm p-4 bg-slate-50/50 border border-slate-200 rounded-2xl outline-none text-slate-700 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all font-medium"
                     required
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block font-sans">Horario Preferido</label>
-                  <select
-                    value={selectedTime}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none dark:text-white focus:border-teal-500/40"
-                  >
-                    {["09:00", "10:00", "11:00", "12:00", "15:00", "16:30", "18:00"].map(hr => (
-                      <option key={hr} value={hr}>{hr} hrs</option>
-                    ))}
-                  </select>
+                <div className="space-y-2 md:col-span-2 mt-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Horarios Disponibles</label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                    {["09:00", "10:00", "11:00", "12:00", "15:00", "16:30", "18:00"].map(hr => {
+                      const activeReservationsCount = allAppointments.filter(
+                        app => app.date === selectedDate && app.time === hr && app.status !== "Cancelled"
+                      ).length;
+                      const trulyOccupied = activeReservationsCount > 0;
+
+                      return (
+                        <button
+                          type="button"
+                          key={hr}
+                          disabled={trulyOccupied}
+                          onClick={() => setSelectedTime(hr)}
+                          className={`p-3 w-full text-sm font-bold rounded-2xl border transition-all ${
+                            trulyOccupied 
+                              ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50" 
+                              : selectedTime === hr 
+                                ? "bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20 scale-105"
+                                : "bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:shadow-sm cursor-pointer"
+                          }`}
+                        >
+                          <span className="block">{hr}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="md:col-span-2 pt-2">
+                <div className="md:col-span-2 pt-4">
                   <button
                     type="submit"
-                    className="bg-teal-650 hover:bg-teal-700 text-white font-bold text-xs py-3.5 px-6 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md hover:shadow-teal-500/10"
+                    className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-4 px-8 rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20"
                   >
-                    <Calendar className="w-4 h-4" />
-                    Solicitar Reserva en Agenda Médica
+                    Confirmar mi hora
+                    <Sparkles className="w-4 h-4 text-amber-300" />
                   </button>
                 </div>
               </form>
             </div>
 
-            {/* 3. HEALTH EDUCATION TIPS (DENTAL STORIES) */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-display font-black text-slate-900 dark:text-white tracking-widest uppercase flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-teal-400" />
-                Consejos Clínicos de Salud Oral
+            {/* UPCOMING APPOINTMENTS */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-3xl p-6 lg:p-8 border border-teal-100">
+              <h3 className="text-xl font-display font-black text-slate-800 mb-6 flex items-center gap-3">
+                <Clock className="w-6 h-6 text-teal-600" />
+                Mis Próximas Horas
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {HEALTH_TIPS.map((tip) => {
-                  const Icon = tip.icon;
-                  return (
-                    <div 
-                      key={tip.title}
-                      className="p-5 bg-white dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800 rounded-2xl relative overflow-hidden flex flex-col justify-between"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] bg-teal-500/10 text-teal-500 border border-teal-500/10 font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                            {tip.category}
-                          </span>
-                          <span className="text-[9px] text-slate-400">{tip.readingTime}</span>
-                        </div>
-                        <div>
-                          <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">{tip.title}</h5>
-                          <p className="text-[10.5px] text-slate-400 mt-2 leading-relaxed h-[68px] line-clamp-4 font-light">
-                            {tip.description}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="border-t border-slate-100 dark:border-slate-800/40 pt-3 mt-4 flex items-center gap-2 text-teal-650 dark:text-teal-400 text-[10px] font-bold">
-                        <Icon className="w-4.5 h-4.5 text-teal-500" />
-                        <span>Artículo Validado</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
-
-          {/* RIGHT SIDEBAR: Upcoming schedules and Personal AI Assistant */}
-          <div className="lg:col-span-4 space-y-8">
-            
-            {/* A) MY UPCOMING APPOINTMENTS */}
-            <div className="bg-white dark:bg-slate-900/40 border-2 border-emerald-500/35 dark:border-emerald-500/30 rounded-3xl p-6 space-y-5 shadow-[0_0_22px_rgba(16,185,129,0.18)]">
-              <div>
-                <h4 className="text-xs font-black uppercase text-teal-600 dark:text-teal-400 tracking-widest block font-sans">
-                  Mis Próximas Citas
-                </h4>
-                <p className="text-[11px] text-slate-400 font-medium">Controles médicos solicitados o confirmados</p>
-              </div>
-
               {myAppointments.length === 0 ? (
-                <div className="p-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-500">
-                  <p>No tienes citas agendadas actualmente.</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Realiza tu primera solicitud con el panel izquierdo.</p>
+                <div className="p-8 text-center bg-white/50 border border-dashed border-teal-200 rounded-2xl text-slate-500 font-medium">
+                  <Calendar className="w-10 h-10 mx-auto text-teal-200 mb-3" />
+                  <p>No tienes citas agendadas por el momento.</p>
                 </div>
               ) : (
-                <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {myAppointments.map((app) => (
                     <div 
                       key={app.id}
-                      className="p-3.5 border border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/30 rounded-2xl flex items-start gap-3 relative overflow-hidden"
+                      className="p-5 bg-white rounded-2xl border border-teal-100 shadow-sm flex items-start gap-4"
                     >
-                      <div className={`absolute top-0 left-0 w-1 h-full ${
-                        app.status === "Confirmed" ? "bg-emerald-500" : app.status === "Completed" ? "bg-slate-400" : "bg-amber-500"
-                      }`} />
-
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex justify-between items-center">
-                          <span className="font-mono text-[10px] font-black text-slate-800 dark:text-slate-200 shrink-0 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                            {app.time} hrs
-                          </span>
-
-                          <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                            app.status === "Confirmed"
-                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
-                              : app.status === "Completed"
-                              ? "bg-slate-200 dark:bg-slate-800 text-slate-500"
-                              : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                          }`}>
-                            {app.status === "Confirmed" ? "Confirmado" : app.status === "Completed" ? "Atendido" : "Pendiente"}
-                          </span>
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {app.treatment.replace(" - [Solicitado por Portal de Cliente]", "")}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-1">
-                            📅 {app.date}  |  🏥 {app.box}
-                          </p>
-                        </div>
+                      <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-full flex flex-col items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold uppercase">{app.date.split("-")[2]}</span>
+                        <span className="text-sm font-black leading-none">{app.time}</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800 leading-tight">
+                          {app.treatment.replace(" - [Agendado Online]", "").replace(" - [Solicitado por Portal de Cliente]", "")}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1 capitalize">{new Date(app.date).toLocaleDateString('es-ES', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                        <span className="inline-block mt-2 text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
+                          {app.status === "Pending" ? "Verificando" : "Confirmada"}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -749,34 +423,94 @@ export default function PatientPortal({
               )}
             </div>
 
-            {/* B) DENTITO PERSONAL PATIENT CO-PILOT CHAT */}
-            <div className="bg-white dark:bg-slate-900/40 border-2 border-indigo-500/35 dark:border-indigo-500/30 rounded-3xl p-6 flex flex-col h-[480px] shadow-[0_0_24px_rgba(99,102,241,0.18)]">
-              <div className="pb-4 border-b border-slate-150 dark:border-slate-800/60 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-500 flex items-center justify-center font-bold text-xs ring-1 ring-teal-500/30">
-                  🤖
+            {/* CLINICS AND PROFESSIONALS DIRECTORY */}
+            <div className="space-y-6 pt-4">
+              <h3 className="text-xl font-display font-black text-slate-800 flex items-center gap-3">
+                <MapPin className="w-6 h-6 text-rose-500 bg-rose-50 p-1 rounded-lg" />
+                Red de Clínicas y Especialistas
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {CLINICS_DIRECTORY.map((clinic) => (
+                  <div key={clinic.id} className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all group duration-300">
+                    <div className="w-full h-32 rounded-2xl overflow-hidden mb-4 relative">
+                      <img 
+                        src={clinic.image} 
+                        alt={clinic.name} 
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-slate-800 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                        <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                        {clinic.rating}
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-sm">{clinic.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1">{clinic.address}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {clinic.specialties.slice(0, 2).map((s, i) => (
+                        <span key={i} className="px-2 py-1 bg-slate-50 text-slate-600 text-[9px] rounded-md font-bold">{s}</span>
+                      ))}
+                      {clinic.specialties.length > 2 && (
+                        <span className="px-2 py-1 bg-slate-50 text-slate-600 text-[9px] rounded-md font-bold">+{clinic.specialties.length - 2}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-slate-100 pt-6">
+                {CLINICIANS_DIRECTORY.map((doc) => (
+                  <div key={doc.id} className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm flex items-center gap-4 hover:border-teal-200 transition-colors">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal-50 to-emerald-100 text-teal-600 flex items-center justify-center font-black text-lg border border-teal-200 shrink-0 shadow-inner">
+                      {doc.avatar}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h5 className="font-bold text-slate-800 text-sm truncate">{doc.name}</h5>
+                      </div>
+                      <p className="text-[10px] text-teal-600 font-bold truncate">{doc.specialty}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md">
+                          <Star className="w-3 h-3 fill-amber-500" /> {doc.rating}
+                        </span>
+                        <span className="text-[9px] text-slate-400 capitalize truncate flex items-center gap-1">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {doc.clinic.split(" ")[0]}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+          </div>
+
+          <div className="lg:col-span-4 space-y-6">
+            
+            {/* VIRTUAL ASSISTANT */}
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-[520px] overflow-hidden">
+              <div className="bg-teal-600 p-5 flex items-center gap-4 text-white">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-2xl shadow-inner shadow-white/30">
+                  🦷
                 </div>
                 <div>
-                  <h4 className="text-xs font-black uppercase text-teal-600 dark:text-teal-400 tracking-widest block font-sans">
-                    Chat con Dentito IA
-                  </h4>
-                  <span className="text-[9.5px] text-slate-400 mt-0.5 inline-flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Asesor clínico activo
-                  </span>
+                  <h4 className="font-bold text-lg leading-none">Dentito</h4>
+                  <p className="text-teal-100 text-xs mt-1 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    En línea ahora
+                  </p>
                 </div>
               </div>
 
-              {/* Messages viewport */}
-              <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1 scrollbar-thin scrollbar-thumb-teal-800">
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50">
                 {chatMessages.map((msg, idx) => (
-                  <div 
-                    key={idx}
-                    className={`flex ${msg.role === 'user' ? "justify-end" : "justify-start"}`}
-                  >
-                    <div className={`p-3 rounded-2xl text-[11px] leading-relaxed max-w-[85%] ${
-                      msg.role === 'user'
-                        ? "bg-teal-600 text-white rounded-br-none font-medium ml-4"
-                        : "bg-slate-50 dark:bg-slate-900/80 border border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-bl-none font-light border-l-3 border-l-teal-500"
+                  <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div className={`p-4 rounded-2xl text-sm max-w-[85%] shadow-sm ${
+                      msg.role === "user"
+                        ? "bg-slate-800 text-white rounded-br-sm"
+                        : "bg-white text-slate-700 rounded-bl-sm border border-slate-100"
                     }`}>
                       {msg.content}
                     </div>
@@ -784,37 +518,45 @@ export default function PatientPortal({
                 ))}
                 {isChatLoading && (
                   <div className="flex justify-start">
-                    <div className="p-3 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/60 rounded-2xl text-[11px] text-slate-400">
-                      Dentito está escribiendo...
+                    <div className="p-4 bg-white border border-slate-100 rounded-2xl rounded-bl-sm text-sm text-slate-400 shadow-sm flex items-center gap-2">
+                      <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" />
+                      <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce delay-75" />
+                      <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce delay-150" />
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Chat action footer */}
-              <form onSubmit={handleSendMessage} className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex gap-2">
+              <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
                 <input
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Escribe tu consulta médica..."
-                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none dark:text-white focus:border-teal-500/40"
+                  placeholder="Pregúntale a Dentito..."
+                  className="w-full text-sm p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-slate-700 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                   disabled={isChatLoading}
                 />
                 <button
                   type="submit"
-                  className="bg-teal-600 font-bold p-3 text-white hover:bg-teal-700 cursor-pointer rounded-xl transition-all border-0 flex items-center justify-center shrink-0"
+                  className="bg-teal-600 text-white p-4 rounded-2xl hover:bg-teal-700 transition-colors shrink-0 shadow-md shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isChatLoading}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5" />
                 </button>
               </form>
             </div>
 
+            {/* SIMPLE TIPS */}
+            <div className="bg-rose-50 rounded-3xl p-6 border border-rose-100 text-center">
+              <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center text-rose-500 mx-auto mb-3">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <h4 className="font-bold text-slate-800 mb-2">¡Sonríe con confianza!</h4>
+              <p className="text-sm text-slate-600">Cepilla tus dientes al menos 2 veces al día y recuerda usar hilo dental. Un hábito pequeño hace una gran diferencia.</p>
+            </div>
+
           </div>
-
         </div>
-
       </main>
     </div>
   );

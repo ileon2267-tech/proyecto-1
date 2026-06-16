@@ -116,58 +116,67 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
   let pocketsGreaterEqual5 = 0;
   let maxCALInMouth = 0;
 
-  Object.values(periodontogram || {}).forEach((state) => {
-    // Each tooth has 6 evaluated surfaces (3 vestibular, 3 palatales/linguales)
+  const allTeeth = [...UPPER_TEETH.right, ...UPPER_TEETH.left, ...LOWER_TEETH.right, ...LOWER_TEETH.left];
+
+  allTeeth.forEach((toothNumber) => {
+    // Skip absent teeth from indices calculation
+    const toothCondition = odontogram?.[toothNumber]?.condition;
+    if (toothCondition === "ausente") return;
+
+    // Each present tooth has 6 evaluated surfaces (3 vestibular, 3 palatales/linguales)
     totalEvaluatedSurfaces += 6;
 
-    if (state.placaVestibular?.mesial) plaqueSurfaces++;
-    if (state.placaVestibular?.central) plaqueSurfaces++;
-    if (state.placaVestibular?.distal) plaqueSurfaces++;
-    if (state.placaPalatino?.mesial) plaqueSurfaces++;
-    if (state.placaPalatino?.central) plaqueSurfaces++;
-    if (state.placaPalatino?.distal) plaqueSurfaces++;
+    const state = periodontogram?.[toothNumber];
+    if (state) {
+      if (state.placaVestibular?.mesial) plaqueSurfaces++;
+      if (state.placaVestibular?.central) plaqueSurfaces++;
+      if (state.placaVestibular?.distal) plaqueSurfaces++;
+      if (state.placaPalatino?.mesial) plaqueSurfaces++;
+      if (state.placaPalatino?.central) plaqueSurfaces++;
+      if (state.placaPalatino?.distal) plaqueSurfaces++;
 
-    if (state.sangradoVestibular?.mesial) bopSurfaces++;
-    if (state.sangradoVestibular?.central) bopSurfaces++;
-    if (state.sangradoVestibular?.distal) bopSurfaces++;
-    if (state.sangradoPalatino?.mesial) bopSurfaces++;
-    if (state.sangradoPalatino?.central) bopSurfaces++;
-    if (state.sangradoPalatino?.distal) bopSurfaces++;
+      if (state.sangradoVestibular?.mesial) bopSurfaces++;
+      if (state.sangradoVestibular?.central) bopSurfaces++;
+      if (state.sangradoVestibular?.distal) bopSurfaces++;
+      if (state.sangradoPalatino?.mesial) bopSurfaces++;
+      if (state.sangradoPalatino?.central) bopSurfaces++;
+      if (state.sangradoPalatino?.distal) bopSurfaces++;
 
-    // Residual pockets counts
-    const vPk = state.vestibularPocket || { mesial: 0, central: 0, distal: 0 };
-    const pPk = state.palatinoPocket || { mesial: 0, central: 0, distal: 0 };
-    if (vPk.mesial >= 5) pocketsGreaterEqual5++;
-    if (vPk.central >= 5) pocketsGreaterEqual5++;
-    if (vPk.distal >= 5) pocketsGreaterEqual5++;
-    if (pPk.mesial >= 5) pocketsGreaterEqual5++;
-    if (pPk.central >= 5) pocketsGreaterEqual5++;
-    if (pPk.distal >= 5) pocketsGreaterEqual5++;
+      // Residual pockets counts
+      const vPk = state.vestibularPocket || { mesial: 0, central: 0, distal: 0 };
+      const pPk = state.palatinoPocket || { mesial: 0, central: 0, distal: 0 };
+      if (vPk.mesial >= 5) pocketsGreaterEqual5++;
+      if (vPk.central >= 5) pocketsGreaterEqual5++;
+      if (vPk.distal >= 5) pocketsGreaterEqual5++;
+      if (pPk.mesial >= 5) pocketsGreaterEqual5++;
+      if (pPk.central >= 5) pocketsGreaterEqual5++;
+      if (pPk.distal >= 5) pocketsGreaterEqual5++;
 
-    // Max CAL Loss in mouth
-    const vRc = state.vestibularRecess || { mesial: 0, central: 0, distal: 0 };
-    const pRc = state.palatinoRecess || { mesial: 0, central: 0, distal: 0 };
-    
-    const calVMesial = (vPk.mesial || 0) + (vRc.mesial || 0);
-    const calVCentral = (vPk.central || 0) + (vRc.central || 0);
-    const calVDistal = (vPk.distal || 0) + (vRc.distal || 0);
-    const calPMesial = (pPk.mesial || 0) + (pRc.mesial || 0);
-    const calPCentral = (pPk.central || 0) + (pRc.central || 0);
-    const calPDistal = (pPk.distal || 0) + (pRc.distal || 0);
+      // Max CAL Loss in mouth
+      const vRc = state.vestibularRecess || { mesial: 0, central: 0, distal: 0 };
+      const pRc = state.palatinoRecess || { mesial: 0, central: 0, distal: 0 };
+      
+      const calVMesial = (vPk.mesial || 0) + (vRc.mesial || 0);
+      const calVCentral = (vPk.central || 0) + (vRc.central || 0);
+      const calVDistal = (vPk.distal || 0) + (vRc.distal || 0);
+      const calPMesial = (pPk.mesial || 0) + (pRc.mesial || 0);
+      const calPCentral = (pPk.central || 0) + (pRc.central || 0);
+      const calPDistal = (pPk.distal || 0) + (pRc.distal || 0);
 
-    const toothMaxCAL = Math.max(calVMesial, calVCentral, calVDistal, calPMesial, calPCentral, calPDistal);
-    if (toothMaxCAL > maxCALInMouth) {
-      maxCALInMouth = toothMaxCAL;
+      const toothMaxCAL = Math.max(calVMesial, calVCentral, calVDistal, calPMesial, calPCentral, calPDistal);
+      if (toothMaxCAL > maxCALInMouth) {
+        maxCALInMouth = toothMaxCAL;
+      }
     }
   });
 
   const oLearyIndexValue = totalEvaluatedSurfaces > 0 
-    ? Math.round((plaqueSurfaces / totalEvaluatedSurfaces) * 105) 
+    ? Math.round((plaqueSurfaces / totalEvaluatedSurfaces) * 100) 
     : 0;
   const normalizedOLeary = Math.min(100, oLearyIndexValue);
 
   const bopIndexValue = totalEvaluatedSurfaces > 0 
-    ? Math.round((bopSurfaces / totalEvaluatedSurfaces) * 105)
+    ? Math.round((bopSurfaces / totalEvaluatedSurfaces) * 100)
     : 0;
   const normalizedBop = Math.min(100, bopIndexValue);
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Patient, Appointment, ClinicalUser } from "./types";
 import { 
   INITIAL_PATIENTS, 
@@ -6,6 +6,8 @@ import {
   createEmptyOdontogram, 
   createEmptyPeriodontogram 
 } from "./initialData";
+import { db, handleFirestoreError, OperationType } from "./firebase";
+import { collection, doc, setDoc, getDocs, deleteDoc, getDocFromServer } from "firebase/firestore";
 import KPIDashboard from "./components/KPIDashboard";
 import Odontograma from "./components/Odontograma";
 import Periodontograma from "./components/Periodontograma";
@@ -19,12 +21,15 @@ import OLearyControl from "./components/OLearyControl";
 import XRayGallery from "./components/XRayGallery";
 import SoapAIAssistant from "./components/SoapAIAssistant";
 import PRARiskAssessment from "./components/PRARiskAssessment";
+import TreatmentPlanModule from "./components/TreatmentPlanModule";
 import SharePatientModal from "./components/SharePatientModal";
+import DirectorioEmpleos from "./components/DirectorioEmpleos";
 import PatientFile from "./components/PatientFile";
 import Logo from "./components/Logo";
 import LoginScreen from "./components/LoginScreen";
 import PatientPortal from "./components/PatientPortal";
 import DentalMarketplace from "./components/DentalMarketplace";
+import SpecialtyWorkspace from "./components/SpecialtyWorkspace";
 
 
 // Icons from Lucide-React
@@ -51,11 +56,13 @@ import {
   Banknote,
   Activity,
   LogOut,
-  ShoppingBag
+  ShoppingBag,
+  User,
+  Briefcase
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-type ActiveTab = "dashboard" | "clinica" | "agenda" | "finanzas" | "dentalstories" | "reportes" | "pacientes" | "ajustes" | "tienda";
+type ActiveTab = "dashboard" | "clinica" | "agenda" | "finanzas" | "dentalstories" | "reportes" | "pacientes" | "ajustes" | "tienda" | "bolsa-empleo";
 
 export default function App() {
   // Session Authentication State
@@ -155,7 +162,7 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
-  const [clinicalSubView, setClinicalSubView] = useState<"odontograma" | "periodontograma" | "pra" | "oleary" | "xrays" | "soap">("odontograma");
+  const [clinicalSubView, setClinicalSubView] = useState<"ficha" | "odontograma" | "periodontograma" | "pra" | "oleary" | "xrays" | "soap" | "presupuesto" | "especialidad">("ficha");
   const [showShareModal, setShowShareModal] = useState(false);
   const [deletingPatientId, setDeletingPatientId] = useState<string | null>(null);
 
@@ -165,6 +172,7 @@ export default function App() {
 
   // Patient Registration Form states
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [newPatientName, setNewPatientName] = useState("");
   const [newPatientPhone, setNewPatientPhone] = useState("");
   const [newPatientEmail, setNewPatientEmail] = useState("");
@@ -173,16 +181,172 @@ export default function App() {
 
   // Patient Search query
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPatientFileId, setSelectedPatientFileId] = useState<string | null>(null);
 
-  // Storage persistent synchronization
+  // Firebase Sync Loading state
+  const [isSyncingFirebase, setIsSyncingFirebase] = useState(true);
+  const [firebaseSyncError, setFirebaseSyncError] = useState<string | null>(null);
+
+  // Keep track of previously synced patients and appointments to do differential synchronization
+  const prevPatientsRef = useRef<Patient[]>([]);
+  const prevAppointmentsRef = useRef<Appointment[]>([]);
+
+  // Validate Firestore Connection
   useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+        console.log("Conexión con Cloud Firestore Enterprise validada.");
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration or network.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  // Fetch initial data from Firestore
+  useEffect(() => {
+    async function loadData() {
+      setIsSyncingFirebase(true);
+      try {
+        const patientsSnap = await getDocs(collection(db, "patients"));
+        let dbPatients: Patient[] = [];
+        patientsSnap.forEach((docSnap) => {
+          dbPatients.push(docSnap.data() as Patient);
+        });
+
+        const appointmentsSnap = await getDocs(collection(db, "appointments"));
+        let dbAppointments: Appointment[] = [];
+        appointmentsSnap.forEach((docSnap) => {
+          dbAppointments.push(docSnap.data() as Appointment);
+        });
+
+        if (dbPatients.length > 0) {
+          setPatients(dbPatients);
+          prevPatientsRef.current = dbPatients;
+          if (dbPatients.some(p => p.id === activePatientId)) {
+            // Keep current
+          } else {
+            setActivePatientId(dbPatients[0].id);
+          }
+        } else {
+          // SEED FIRST TIME
+          console.log("Base de datos vacía, inicializando con pacientes por defecto...");
+          for (const patient of INITIAL_PATIENTS) {
+            await setDoc(doc(db, "patients", patient.id), patient);
+          }
+          setPatients(INITIAL_PATIENTS);
+          prevPatientsRef.current = INITIAL_PATIENTS;
+        }
+
+        if (dbAppointments.length > 0) {
+          setAppointments(dbAppointments);
+          prevAppointmentsRef.current = dbAppointments;
+        } else {
+          // SEED FIRST TIME
+          console.log("Base de datos de citas vacía, inicializando por defecto...");
+          for (const app of INITIAL_APPOINTMENTS) {
+            await setDoc(doc(db, "appointments", app.id), app);
+          }
+          setAppointments(INITIAL_APPOINTMENTS);
+          prevAppointmentsRef.current = INITIAL_APPOINTMENTS;
+        }
+      } catch (error) {
+        console.error("Error al cargar datos desde Firebase Firestore:", error);
+        setFirebaseSyncError("Se está utilizando el respaldo de memoria local temporal.");
+        try {
+          handleFirestoreError(error, OperationType.LIST, "patients");
+        } catch (wrappedErr) {
+          // Logged
+        }
+      } finally {
+        setIsSyncingFirebase(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Sync state modifications dynamically
+  useEffect(() => {
+    if (isSyncingFirebase) return;
+    
+    // Local storage backup
     localStorage.setItem("perioPatients", JSON.stringify(patients));
-  }, [patients]);
+
+    async function syncPatientsToCloud() {
+      const prevList = prevPatientsRef.current;
+      
+      // Update/Create Patient
+      for (const p of patients) {
+        const prevVersion = prevList.find(v => v.id === p.id);
+        if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(p)) {
+          try {
+            await setDoc(doc(db, "patients", p.id), p);
+            console.log(`Durable Cloud Sync: Actualizado paciente ${p.name}`);
+          } catch (err) {
+            console.error(`Error de guardado en la nube para paciente ${p.name}:`, err);
+          }
+        }
+      }
+
+      // Delete Patient
+      for (const prev of prevList) {
+        if (!patients.some(p => p.id === prev.id)) {
+          try {
+            await deleteDoc(doc(db, "patients", prev.id));
+            console.log(`Durable Cloud Sync: Eliminado paciente ${prev.name}`);
+          } catch (err) {
+            console.error(`Error al eliminar paciente ${prev.name} en la nube:`, err);
+          }
+        }
+      }
+
+      prevPatientsRef.current = patients;
+    }
+
+    syncPatientsToCloud();
+  }, [patients, isSyncingFirebase]);
 
   useEffect(() => {
+    if (isSyncingFirebase) return;
+
+    // Local storage backup
     localStorage.setItem("perioAppointments", JSON.stringify(appointments));
-  }, [appointments]);
+
+    async function syncAppointmentsToCloud() {
+      const prevList = prevAppointmentsRef.current;
+
+      // Update/Create Appointment
+      for (const app of appointments) {
+        const prevVersion = prevList.find(v => v.id === app.id);
+        if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(app)) {
+          try {
+            await setDoc(doc(db, "appointments", app.id), app);
+            console.log(`Durable Cloud Sync: Actualizada cita ${app.id}`);
+          } catch (err) {
+            console.error(`Error de guardado en la nube para cita ${app.id}:`, err);
+          }
+        }
+      }
+
+      // Delete Appointment
+      for (const prev of prevList) {
+        if (!appointments.some(app => app.id === prev.id)) {
+          try {
+            await deleteDoc(doc(db, "appointments", prev.id));
+            console.log(`Durable Cloud Sync: Eliminada cita ${prev.id}`);
+          } catch (err) {
+            console.error(`Error al eliminar cita ${prev.id} en la nube:`, err);
+          }
+        }
+      }
+
+      prevAppointmentsRef.current = appointments;
+    }
+
+    syncAppointmentsToCloud();
+  }, [appointments, isSyncingFirebase]);
 
   useEffect(() => {
     localStorage.setItem("perioActivePatientId", activePatientId);
@@ -196,7 +360,14 @@ export default function App() {
 
   useEffect(() => {
     const handleNavigateEvent = (e: any) => {
-      if (e.detail) setActiveTab(e.detail);
+      if (e.detail) {
+        if (typeof e.detail === "string") {
+          setActiveTab(e.detail as any);
+        } else if (typeof e.detail === "object") {
+          if (e.detail.tab) setActiveTab(e.detail.tab);
+          if (e.detail.subView) setClinicalSubView(e.detail.subView);
+        }
+      }
     };
     window.addEventListener("periodash-navigate", handleNavigateEvent);
     return () => window.removeEventListener("periodash-navigate", handleNavigateEvent);
@@ -209,32 +380,52 @@ export default function App() {
     e.preventDefault();
     if (!newPatientName.trim()) return;
 
-    const newPat: Patient = {
-      id: `pat-${Date.now()}`,
-      name: newPatientName,
-      phone: newPatientPhone,
-      email: newPatientEmail,
-      birthdate: newPatientBirthdate || "1990-01-01",
-      notes: newPatientNotes,
-      createdAt: new Date().toISOString(),
-      odontogram: createEmptyOdontogram(),
-      periodontogram: createEmptyPeriodontogram(),
-      oLeary: {},
-      anamnesis: {
-        hta: false,
-        diabetes: false,
-        tabaquismo: 0,
-        alergias: "",
-        dolorActual: "ninguno",
-        notasSistemicas: "",
-      },
-      xRays: [],
-      treatmentPlan: { procedures: [], financing: { months: 1, downPayment: 0, interestRate: 0 } },
-      evolutions: [],
-    };
+    if (editingPatientId) {
+      setPatients(prev => prev.map(p => {
+        if (p.id === editingPatientId) {
+          return {
+            ...p,
+            name: newPatientName,
+            phone: newPatientPhone,
+            email: newPatientEmail,
+            birthdate: newPatientBirthdate || p.birthdate,
+            notes: newPatientNotes,
+          }
+        }
+        return p;
+      }));
+    } else {
+      const newPat: Patient = {
+        id: `pat-${Date.now()}`,
+        name: newPatientName,
+        phone: newPatientPhone,
+        email: newPatientEmail,
+        birthdate: newPatientBirthdate || "1990-01-01",
+        notes: newPatientNotes,
+        createdAt: new Date().toISOString(),
+        odontogram: createEmptyOdontogram(),
+        periodontogram: createEmptyPeriodontogram(),
+        oLeary: {},
+        anamnesis: {
+          motivoConsulta: "",
+          historiaMotivoConsulta: "",
+          hta: false,
+          diabetes: false,
+          tabaquismo: 0,
+          alergias: "",
+          dolorActual: "ninguno",
+          notasSistemicas: "",
+        },
+        xRays: [],
+        treatmentPlan: { procedures: [], financing: { months: 1, downPayment: 0, interestRate: 0 } },
+        evolutions: [],
+        consentimientos: [],
+      };
 
-    setPatients((prev) => [newPat, ...prev]);
-    setActivePatientId(newPat.id);
+      setPatients((prev) => [newPat, ...prev]);
+      setActivePatientId(newPat.id);
+      setActiveTab("clinica"); // jump immediately to clinic charting for dentist
+    }
     
     // Clear registration fields
     setNewPatientName("");
@@ -242,8 +433,18 @@ export default function App() {
     setNewPatientEmail("");
     setNewPatientBirthdate("");
     setNewPatientNotes("");
+    setEditingPatientId(null);
     setShowRegisterForm(false);
-    setActiveTab("clinica"); // jump immediately to clinic charting for dentist
+  };
+
+  const startEditPatient = (p: Patient) => {
+    setEditingPatientId(p.id);
+    setNewPatientName(p.name);
+    setNewPatientPhone(p.phone);
+    setNewPatientEmail(p.email);
+    setNewPatientBirthdate(p.birthdate);
+    setNewPatientNotes(p.notes);
+    setShowRegisterForm(true);
   };
 
   const handleDeletePatient = (patientId: string) => {
@@ -295,22 +496,9 @@ export default function App() {
     );
   };
 
-  // Tab rendering
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return (
-          <KPIDashboard 
-            patients={patients} 
-            appointments={appointments}
-            onNavigateTo={(tab) => setActiveTab(tab as ActiveTab)}
-            onSelectPatient={(id) => setActivePatientId(id)}
-          />
-        );
-
-      case "clinica":
-        return (
-          <div className="space-y-6 animate-fade-in" id="clinical-area">
+  const renderWorkspace = () => {
+    return (
+      <div className="space-y-6 animate-fade-in" id="clinical-area">
             {/* Active Patient Bar */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <div className="flex items-start gap-3.5">
@@ -331,6 +519,12 @@ export default function App() {
 
               {/* Patient selections dropdown */}
               <div className="flex gap-2.5 items-center w-full lg:w-auto">
+                <button
+                  onClick={() => setActivePatientId("")}
+                  className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center cursor-pointer shadow-sm"
+                >
+                  Volver al Directorio
+                </button>
                 <select
                   value={activePatientId}
                   onChange={(e) => setActivePatientId(e.target.value)}
@@ -345,11 +539,12 @@ export default function App() {
                 </select>
 
                 <button
-                  onClick={() => window.print()}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-xs"
-                  title="Imprimir Ficha Clínica"
+                  onClick={() => setActiveTab("reportes")}
+                  className="p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/65 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800/60 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-bold"
+                  title="Configurar y Generar Reporte A4"
                 >
                   <Printer className="w-4 h-4" />
+                  <span>Reporte A4</span>
                 </button>
                 <button
                   onClick={() => setShowShareModal(true)}
@@ -363,128 +558,498 @@ export default function App() {
             </div>
 
             {activePatient ? (
-              <div className="space-y-6">
-                {/* Clinical sub tab selectors */}
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 flex-shrink-0 w-full overflow-x-auto hide-scrollbar">
-                  <button
-                    onClick={() => setClinicalSubView("odontograma")}
-                    className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
-                      clinicalSubView === "odontograma"
-                        ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
-                        : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    Odontograma Gráfico
-                  </button>
-                  <button
-                    onClick={() => setClinicalSubView("periodontograma")}
-                    className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
-                      clinicalSubView === "periodontograma"
-                        ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
-                        : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    Periodontograma Clínico
-                  </button>
-                  <button
-                    onClick={() => setClinicalSubView("pra")}
-                    className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
-                      clinicalSubView === "pra"
-                        ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
-                        : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    Análisis de Riesgo PRA
-                  </button>
-                  <button
-                    onClick={() => setClinicalSubView("oleary")}
-                    className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
-                      clinicalSubView === "oleary"
-                        ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
-                        : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    Resumen O'Leary
-                  </button>
-                  <button
-                    onClick={() => setClinicalSubView("xrays")}
-                    className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
-                      clinicalSubView === "xrays"
-                        ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
-                        : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    Tomografías Digitales
-                  </button>
-                  <button
-                    onClick={() => setClinicalSubView("soap")}
-                    className={`flex-1 py-2 px-4 whitespace-nowrap rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
-                      clinicalSubView === "soap"
-                        ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-md scale-[1.01]"
-                        : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    Redactor SOAP (AI)
-                  </button>
-                </div>
+              <div className="space-y-6 font-display">
+                
+                {/* Clinical Alerts and Systemic Highlights Strip */}
+                <div className="bg-slate-50/80 dark:bg-slate-900/65 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs select-none">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-teal-500/10 rounded-xl border border-teal-500/20">
+                      <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-450" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-none">Radar de Alertas Sistémicas</h4>
+                      <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-bold mt-1">Estado clínico actual relevante para cirugías y sondajes periodontales.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {/* HTA Alert */}
+                    {activePatient.anamnesis.hta && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-red-500/10 text-red-650 dark:text-red-400 rounded-full border border-red-500/20 shadow-xs animate-pulse">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                        HTA Activa
+                      </span>
+                    )}
 
-                {/* Sub-view representation */}
-                {clinicalSubView === "odontograma" ? (
-                  <Odontograma 
-                    odontogram={activePatient.odontogram} 
-                    onChange={handleUpdateOdontogram}
-                  />
-                ) : clinicalSubView === "periodontograma" ? (
-                  <Periodontograma 
-                    periodontogram={activePatient.periodontogram}
-                    onChange={handleUpdatePeriodontogram}
-                    odontogram={activePatient.odontogram}
-                    patient={activePatient}
-                    onUpdatePatient={(updatedPat) => {
-                      setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                    }}
-                  />
-                ) : clinicalSubView === "pra" ? (
-                  <PRARiskAssessment 
-                    periodontogram={activePatient.periodontogram}
-                    odontogram={activePatient.odontogram}
-                    patient={activePatient}
-                    onUpdatePatient={(updatedPat) => {
-                      setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                    }}
-                  />
-                ) : clinicalSubView === "oleary" ? (
-                  <OLearyControl 
-                    patient={activePatient}
-                    onUpdate={(newO) => {
-                      setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, oLeary: newO } : p))
-                    }}
-                  />
-                ) : clinicalSubView === "xrays" ? (
-                  <XRayGallery
-                    patient={activePatient}
-                    onUpdate={(newX) => {
-                       setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, xRays: newX } : p))
-                    }}
-                  />
-                ) : (
-                  <SoapAIAssistant 
-                    patient={activePatient} 
-                    doctorName={doctorName}
-                    onUpdatePatient={(updatedPat) => {
-                      setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                    }}
-                  />
-                )}
+                    {/* Diabetes Alert */}
+                    {activePatient.anamnesis.diabetes ? (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold rounded-full border shadow-xs ${
+                        activePatient.anamnesis.diabetesStatus === 'severe'
+                          ? "bg-rose-500/10 text-rose-650 dark:text-rose-455 border-rose-500/20 animate-pulse"
+                          : "bg-amber-500/10 text-amber-650 dark:text-amber-400 border-amber-500/20"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${activePatient.anamnesis.diabetesStatus === 'severe' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                        Diabetes {activePatient.anamnesis.diabetesStatus === 'severe' ? 'Descompensada' : 'Controlada'}
+                      </span>
+                    ) : null}
+
+                    {/* Smoking Alert */}
+                    {activePatient.anamnesis.tabaquismo > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-slate-500/10 text-slate-650 dark:text-slate-300 rounded-full border border-slate-500/20">
+                        🚬 {activePatient.anamnesis.tabaquismo} cig./día
+                      </span>
+                    ) : null}
+
+                    {/* Allergies Alert */}
+                    {activePatient.anamnesis.alergias ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-yellow-500/10 text-yellow-750 dark:text-yellow-400 rounded-full border border-yellow-500/20 max-w-[200px]" title={activePatient.anamnesis.alergias}>
+                        ⚠️ Alergias: {activePatient.anamnesis.alergias}
+                      </span>
+                    ) : null}
+
+                    {/* Current Pain Alert */}
+                    {activePatient.anamnesis.dolorActual && activePatient.anamnesis.dolorActual !== "ninguno" && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-orange-500/10 text-orange-655 dark:text-orange-400 rounded-full border border-orange-500/20">
+                        🔥 Dolor: {activePatient.anamnesis.dolorActual.toUpperCase()}
+                      </span>
+                    )}
+
+                    {/* Safe State indicator fallback */}
+                    {!activePatient.anamnesis.hta && !activePatient.anamnesis.diabetes && activePatient.anamnesis.tabaquismo === 0 && !activePatient.anamnesis.alergias && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 rounded-full border border-emerald-500/20 shadow-xs">
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                        Sistémicamente Sano
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Responsive Clinical Layout Container */}
+                <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
+                  
+                  {/* SIDEBAR NAVIGATION CONTROL PANEL */}
+                  <div className="space-y-4">
+                    
+                    {/* Desktop Sidebar Control Panel */}
+                    <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-4">
+                      <div className="pb-3 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                            Ficha Clínica
+                          </h3>
+                          <p className="text-[11px] text-slate-605 dark:text-slate-400 font-bold mt-0.5">
+                            Estaciones de Trabajo
+                          </p>
+                        </div>
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {[
+                          {
+                            id: "administracion",
+                            label: "Administrativo",
+                            icon: User,
+                            colorClass: "text-blue-600 dark:text-blue-400",
+                            items: [
+                              { id: "ficha", label: "Ficha Médica (Anamnesis)" }
+                            ]
+                          },
+                          {
+                            id: "evaluacion",
+                            label: "Ficha & Diagnóstico",
+                            icon: Stethoscope,
+                            colorClass: "text-teal-600 dark:text-teal-400",
+                            items: [
+                              { id: "especialidad", label: "Consola Especialidades", actsSpec: true },
+                              { id: "odontograma", label: "Odontograma Gráfico" },
+                              { id: "xrays", label: "Tomografías Digitales" },
+                            ]
+                          },
+                          {
+                            id: "periodoncia",
+                            label: "Salud Periodontal",
+                            icon: Activity,
+                            colorClass: "text-emerald-605 dark:text-emerald-400",
+                            items: [
+                              { id: "periodontograma", label: "Periodontograma Clínico" },
+                              { id: "pra", label: "Análisis de Riesgo PRA" },
+                              { id: "oleary", label: "Resumen O'Leary" },
+                            ]
+                          },
+                          {
+                            id: "gestion",
+                            label: "Evolución & Planes",
+                            icon: Sparkles,
+                            colorClass: "text-indigo-600 dark:text-indigo-400",
+                            items: [
+                              { id: "soap", label: "Redactor SOAP (AI)" },
+                              { id: "presupuesto", label: "Presupuestos & Planes" },
+                            ]
+                          }
+                        ].map(cat => {
+                          const Icon = cat.icon;
+                          const isCatActive = [
+                            {
+                              id: "administracion",
+                              items: ["ficha"]
+                            },
+                            {
+                              id: "evaluacion",
+                              items: ["especialidad", "odontograma", "xrays"]
+                            },
+                            {
+                              id: "periodoncia",
+                              items: ["periodontograma", "pra", "oleary"]
+                            },
+                            {
+                              id: "gestion",
+                              items: ["soap", "presupuesto"]
+                            }
+                          ].find(c => c.id === cat.id)?.items.includes(clinicalSubView);
+                          
+                          return (
+                            <div key={cat.id} className="space-y-1.5">
+                              <div className={`flex items-center gap-2 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                                isCatActive ? cat.colorClass : "text-slate-400 dark:text-slate-500"
+                              }`}>
+                                <Icon className="w-3.5 h-3.5" />
+                                <span>{cat.label}</span>
+                              </div>
+                              
+                              <div className="space-y-0.5">
+                                {cat.items.map(item => {
+                                  const isItemActive = clinicalSubView === item.id;
+                                  return (
+                                    <button
+                                      key={item.id}
+                                      onClick={() => setClinicalSubView(item.id as any)}
+                                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 flex items-center justify-between group cursor-pointer border ${
+                                        isItemActive
+                                          ? "bg-slate-50/80 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-teal-600 dark:text-teal-400 shadow-xs"
+                                          : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 border-transparent"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 max-w-[85%]">
+                                        <span className="truncate">{item.label}</span>
+                                        {item.actsSpec && activePatient && (activePatient as any).activeSpecialty && (
+                                          <span className="text-[8px] uppercase px-1 py-0.2 rounded bg-teal-500/10 text-teal-650 dark:text-teal-400 font-mono font-black border border-teal-500/10">
+                                            {((activePatient as any).activeSpecialty || "perio").slice(0, 3)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-150 flex-shrink-0 ${
+                                        isItemActive 
+                                          ? "text-teal-600 dark:text-teal-400 translate-x-0.5" 
+                                          : "text-slate-300 dark:text-slate-700/80 group-hover:text-slate-450 group-hover:translate-x-0.5"
+                                      }`} />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Mobile Category & Responsive sub-views Selector */}
+                    <div className="block lg:hidden space-y-3.5">
+                      {/* Responsive Core Segments */}
+                      <div className="grid grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                        {[
+                          { id: "evaluacion", label: "Diagnóstico", icon: Stethoscope, defaultItem: "especialidad" },
+                          { id: "periodoncia", label: "Periodoncia", icon: Activity, defaultItem: "periodontograma" },
+                          { id: "gestion", label: "Copiloto & Planes", icon: Sparkles, defaultItem: "soap" }
+                        ].map(cat => {
+                          const Icon = cat.icon;
+                          const itemsOfCat = cat.id === "evaluacion" 
+                            ? ["especialidad", "odontograma", "xrays"] 
+                            : cat.id === "periodoncia" 
+                            ? ["periodontograma", "pra", "oleary"] 
+                            : ["soap", "presupuesto"];
+                          
+                          const isActive = itemsOfCat.includes(clinicalSubView);
+                          
+                          return (
+                            <button
+                              key={cat.id}
+                              onClick={() => setClinicalSubView(cat.defaultItem as any)}
+                              className={`py-2 px-1.5 rounded-xl text-[10px] font-black tracking-wide transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer border ${
+                                isActive
+                                  ? "bg-white dark:bg-slate-900 border-slate-200/50 dark:border-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                                  : "text-slate-550 dark:text-slate-400 hover:text-slate-800 border-transparent"
+                              }`}
+                            >
+                              <Icon className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{cat.label.split(" ")[0]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Second tier pills filtered by Category */}
+                      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pb-1">
+                        {[
+                          {
+                            id: "evaluacion",
+                            items: [
+                              { id: "especialidad", label: "Especialidades" },
+                              { id: "odontograma", label: "Odontograma" },
+                              { id: "xrays", label: "Tomografías" },
+                            ]
+                          },
+                          {
+                            id: "periodoncia",
+                            items: [
+                              { id: "periodontograma", label: "Periodontograma" },
+                              { id: "pra", label: "Riesgo PRA" },
+                              { id: "oleary", label: "O'Leary" },
+                            ]
+                          },
+                          {
+                            id: "gestion",
+                            items: [
+                              { id: "soap", label: "Redactor SOAP AI" },
+                              { id: "presupuesto", label: "Presupuestos" },
+                            ]
+                          }
+                        ].find(c => {
+                          const activeCategoryString = ["especialidad", "odontograma", "xrays"].includes(clinicalSubView)
+                            ? "evaluacion"
+                            : ["periodontograma", "pra", "oleary"].includes(clinicalSubView)
+                            ? "periodoncia"
+                            : "gestion";
+                          return c.id === activeCategoryString;
+                        })?.items.map(item => {
+                          const isItemActive = clinicalSubView === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => setClinicalSubView(item.id as any)}
+                              className={`py-1.5 px-4 rounded-full text-[11px] font-bold whitespace-nowrap border transition-all cursor-pointer ${
+                                isItemActive
+                                  ? "bg-teal-600 border-teal-600 text-white shadow-xs"
+                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/45"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Ambient info bar inside left side on Desktop */}
+                    {activePatient && (
+                      <div className="hidden lg:block bg-gradient-to-br from-slate-50/80 to-slate-100/40 dark:from-slate-900/45 dark:to-slate-950/20 border border-slate-200/50 dark:border-slate-800/55 p-4 rounded-2xl space-y-2.5">
+                        <span className="text-[9px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase block">Resumen Diagnóstico</span>
+                        <div className="space-y-1">
+                          <p className="text-xs font-extrabold text-slate-850 dark:text-slate-350">{activePatient.name}</p>
+                          <p className="text-[10px] text-slate-450 font-medium">Bolsas calculadas: {
+                            Object.values(activePatient.periodontogram || {}).reduce((acc, currentTooth: any) => {
+                              let pockets = 0;
+                              if (currentTooth) {
+                                const pts = ["pv1", "pv2", "pv3", "pl1", "pl2", "pl3"];
+                                pts.forEach(pt => {
+                                  if (currentTooth[pt] >= 4) pockets++;
+                                });
+                              }
+                              return acc + pockets;
+                            }, 0)
+                          } localizaciones</p>
+                        </div>
+                        <div className="pt-2 border-t border-slate-200/40 dark:border-slate-800/40 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                          <span className="font-bold">Especialidad activa:</span>
+                          <span className="font-black text-teal-600 dark:text-teal-400 uppercase">
+                            {(activePatient as any).activeSpecialty || "periodoncia"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* CENTRAL ACTIVE WORKSPACE COMPONENT PANEL */}
+                  <div className="min-w-0 bg-white/40 dark:bg-slate-900/5 rounded-2xl">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={clinicalSubView}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                      >
+                        {clinicalSubView === "ficha" ? (
+                          <PatientFile 
+                            patient={activePatient}
+                            onUpdatePatient={(updated) => {
+                              setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
+                            }}
+                            onClose={() => setActivePatientId("")}
+                          />
+                        ) : clinicalSubView === "especialidad" ? (
+                          <SpecialtyWorkspace
+                            patient={activePatient}
+                            onUpdatePatient={(updatedPat) => {
+                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                            }}
+                            onNavigateToSubView={(subView) => setClinicalSubView(subView as any)}
+                          />
+                        ) : clinicalSubView === "odontograma" ? (
+                          <Odontograma 
+                            odontogram={activePatient.odontogram} 
+                            onChange={handleUpdateOdontogram}
+                          />
+                        ) : clinicalSubView === "periodontograma" ? (
+                          <Periodontograma 
+                            periodontogram={activePatient.periodontogram}
+                            onChange={handleUpdatePeriodontogram}
+                            odontogram={activePatient.odontogram}
+                            patient={activePatient}
+                            onUpdatePatient={(updatedPat) => {
+                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                            }}
+                          />
+                        ) : clinicalSubView === "pra" ? (
+                          <PRARiskAssessment 
+                            periodontogram={activePatient.periodontogram}
+                            odontogram={activePatient.odontogram}
+                            patient={activePatient}
+                            onUpdatePatient={(updatedPat) => {
+                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                            }}
+                          />
+                        ) : clinicalSubView === "oleary" ? (
+                          <OLearyControl 
+                            patient={activePatient}
+                            onUpdate={(newO) => {
+                              setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, oLeary: newO } : p))
+                            }}
+                          />
+                        ) : clinicalSubView === "xrays" ? (
+                          <XRayGallery
+                            patient={activePatient}
+                            onUpdate={(newX) => {
+                               setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, xRays: newX } : p))
+                            }}
+                          />
+                        ) : clinicalSubView === "soap" ? (
+                          <SoapAIAssistant 
+                            patient={activePatient} 
+                            doctorName={doctorName}
+                            onUpdatePatient={(updatedPat) => {
+                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                            }}
+                          />
+                        ) : (
+                          <TreatmentPlanModule 
+                            patient={activePatient}
+                            aranceles={aranceles}
+                            onUpdatePatient={(updatedPat) => {
+                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                            }}
+                          />
+                        )}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </div> {/* End pattern responsive clinical containment */}
               </div>
             ) : (
-              <div className="bg-slate-50 dark:bg-slate-800 py-20 text-center border-2 border-dashed border-slate-200 dark:border-slate-800/80 rounded-2xl space-y-3.5">
-                <ClipboardList className="w-12 h-12 text-slate-400 mx-auto animate-pulse" />
-                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Sin expediente clínico consultor activo</h4>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto font-light">Selecciona a un paciente de nuestra lista o registra un nuevo código dental de entrada.</p>
+              <div className="bg-slate-50/50 dark:bg-slate-900/40 p-8 rounded-3xl border border-slate-205 dark:border-slate-800 text-center space-y-6 shadow-sm">
+                <div className="max-w-md mx-auto space-y-2">
+                  <div className="w-14 h-14 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl flex items-center justify-center border border-teal-500/20 mx-auto">
+                    <ClipboardList className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-display font-black text-slate-850 dark:text-white">Estación de Diagnóstico Clínico</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    Por favor, selecciona un expediente médico para habilitar el Odontograma anatómico y el Periodontograma paramétrico:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto text-left">
+                  {patients.map((p) => {
+                    const pockets = Object.values(p.periodontogram || {}).reduce((acc, currentTooth: any) => {
+                      let pcts = 0;
+                      if (currentTooth) {
+                        const pts = ["pv1", "pv2", "pv3", "pl1", "pl2", "pl3"];
+                        pts.forEach(pt => {
+                          if (currentTooth[pt] >= 4) pcts++;
+                        });
+                      }
+                      return acc + pcts;
+                    }, 0);
+
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setActivePatientId(p.id);
+                          setClinicalSubView("especialidad");
+                        }}
+                        className="p-5 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/80 rounded-2xl hover:border-teal-500/50 hover:shadow-md transition-all cursor-pointer text-left group flex flex-col justify-between h-40"
+                      >
+                        <div className="space-y-1 w-full">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono font-black text-slate-400 dark:text-slate-500">
+                              EXP: {p.id.split('-')[1] || p.id}
+                            </span>
+                            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-teal-500/5 text-teal-600 dark:text-teal-450 font-bold">
+                              Activo
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                            {p.name}
+                          </h4>
+                          <p className="text-[10px] text-slate-450 dark:text-slate-500 truncate">
+                            🎂 {p.birthdate}  |  📞 {p.phone}
+                          </p>
+                        </div>
+
+                        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-3 w-full flex items-center justify-between text-[10px]">
+                          <span className="font-semibold text-slate-450 dark:text-slate-400">
+                            Bolsas &ge; 4mm: <strong className="text-indigo-650 dark:text-indigo-400 font-bold">{pockets}</strong>
+                          </span>
+                          <span className="text-teal-600 dark:text-teal-400 font-black uppercase tracking-wider inline-flex items-center gap-1">
+                            Abrir Consola &rarr;
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-4 border-t border-slate-200/40 dark:border-slate-800/40 max-w-sm mx-auto">
+                  <button
+                    onClick={() => {
+                      setActiveTab("pacientes");
+                      setShowRegisterForm(true);
+                    }}
+                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-705 text-slate-700 dark:text-slate-350 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Registrar Nuevo Expediente
+                  </button>
+                </div>
               </div>
             )}
           </div>
+        );
+  };
+
+  // Tab rendering
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return (
+          <KPIDashboard 
+            patients={patients} 
+            appointments={appointments}
+            onNavigateTo={(tab) => setActiveTab(tab as ActiveTab)}
+            onSelectPatient={(id) => setActivePatientId(id)}
+          />
         );
 
       case "agenda":
@@ -499,6 +1064,9 @@ export default function App() {
           />
         );
 
+      case "bolsa-empleo":
+        return <DirectorioEmpleos />;
+
       case "pacientes":
         const filtered = patients.filter((p) => 
           p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -506,21 +1074,8 @@ export default function App() {
           p.phone.includes(searchQuery)
         );
 
-        if (selectedPatientFileId) {
-          const filePatient = patients.find(p => p.id === selectedPatientFileId);
-          if (filePatient) {
-            return (
-              <div className="animate-fade-in z-10 relative w-full">
-                <PatientFile 
-                  patient={filePatient} 
-                  onUpdatePatient={(updated) => {
-                    setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
-                  }} 
-                  onClose={() => setSelectedPatientFileId(null)} 
-                />
-              </div>
-            );
-          }
+        if (activePatientId) {
+          return renderWorkspace();
         }
 
         return (
@@ -552,7 +1107,7 @@ export default function App() {
                 >
                   <h4 className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3 w-full">
                     <UserPlus className="w-4 h-4 text-teal-600" />
-                    <span>Nuevo Expediente Histórico Odontorradicular</span>
+                    <span>{editingPatientId ? "Editar Expediente" : "Nuevo Expediente Histórico Odontorradicular"}</span>
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -614,10 +1169,25 @@ export default function App() {
 
                   <div className="flex gap-2 justify-end pt-2">
                     <button
+                      type="button"
+                      onClick={() => {
+                        setShowRegisterForm(false);
+                        setEditingPatientId(null);
+                        setNewPatientName("");
+                        setNewPatientPhone("");
+                        setNewPatientEmail("");
+                        setNewPatientBirthdate("");
+                        setNewPatientNotes("");
+                      }}
+                      className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
                       type="submit"
                       className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs py-2.5 px-5 rounded-xl cursor-pointer transition-all shadow-md"
                     >
-                      Crear Ficha y Habilitar Periodonto
+                      {editingPatientId ? "Guardar Cambios" : "Crear Ficha y Habilitar Periodonto"}
                     </button>
                   </div>
                 </motion.form>
@@ -672,26 +1242,20 @@ export default function App() {
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
                               <button
-                                onClick={() => setSelectedPatientFileId(p.id)}
-                                className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 hover:text-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
-                              >
-                                Ficha Médica
-                              </button>
-                              <button
                                 onClick={() => {
                                   setActivePatientId(p.id);
-                                  setActiveTab("clinica");
+                                  setClinicalSubView("ficha");
                                 }}
-                                className="bg-teal-50 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400 hover:bg-teal-100 hover:text-teal-800 border border-teal-100 dark:border-teal-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                className="bg-teal-50 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400 hover:bg-teal-100 hover:text-teal-800 border border-teal-100 dark:border-teal-800 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
                               >
-                                Odontograma
+                                Abrir Expediente
                               </button>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                              <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => setShowRegisterForm(true)}
+                                  onClick={() => startEditPatient(p)}
                                   className="p-2 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 rounded-lg transition-all"
                                   title="Editar"
                                 >
@@ -995,18 +1559,18 @@ export default function App() {
         <nav className="flex-1 px-3 space-y-1">
           {[
             { id: "dashboard", label: "Panel Principal", icon: LayoutDashboard },
-            { id: "clinica", label: "Ficha Odonto/Perio", icon: Stethoscope },
+            { id: "pacientes", label: "Pacientes", icon: Users },
             { id: "agenda", label: "Agenda Médica", icon: Calendar },
             { id: "finanzas", label: "Plan & Finanzas", icon: Banknote },
+            { id: "bolsa-empleo", label: "Bolsa de Empleo", icon: Briefcase },
             { id: "reportes", label: "Imp / Reportes", icon: Printer },
-            { id: "pacientes", label: "Pacientes", icon: Users },
             { id: "dentalstories", label: "DentalStories / Hub", icon: MessageSquare },
             { id: "tienda", label: "Mercado Dental", icon: ShoppingBag },
             { id: "ajustes", label: "Ajustes", icon: Settings }
           ].map((item) => {
             const ActiveIcon = item.icon;
             const isActive = activeTab === item.id;
-            const isNeon = item.id === "dentalstories" || item.id === "tienda";
+            const isNeon = item.id === "dentalstories" || item.id === "tienda" || item.id === "bolsa-empleo";
             return (
               <button
                 key={item.id}
@@ -1112,15 +1676,15 @@ export default function App() {
         {[
           { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
           { id: "pacientes", label: "Pacientes", icon: Users },
-          { id: "clinica", label: "Ficha", icon: Stethoscope },
           { id: "agenda", label: "Agenda", icon: Calendar },
+          { id: "bolsa-empleo", label: "Empleos", icon: Briefcase },
           { id: "dentalstories", label: "Stories", icon: MessageSquare },
           { id: "tienda", label: "Mercado", icon: ShoppingBag },
           { id: "ajustes", label: "Ajustes", icon: Settings }
         ].map((item) => {
           const ActiveIcon = item.icon;
           const isActive = activeTab === item.id;
-          const isNeon = item.id === "dentalstories" || item.id === "tienda";
+          const isNeon = item.id === "dentalstories" || item.id === "tienda" || item.id === "bolsa-empleo";
           return (
             <button
               key={item.id}
@@ -1153,7 +1717,16 @@ export default function App() {
       </nav>
 
       {/* FLOATING CHATBOT ENGINE */}
-      <DentitoChat activePatient={activePatient} />
+      <DentitoChat 
+        activePatient={activePatient} 
+        patients={patients}
+        appointments={appointments}
+        activeTab={activeTab}
+        clinicalSubView={clinicalSubView}
+        doctorName={doctorName}
+        clinicName={clinicName}
+        aranceles={aranceles}
+      />
 
       <Spotlight 
         patients={patients} 

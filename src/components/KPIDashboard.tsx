@@ -28,34 +28,51 @@ export default function KPIDashboard({
   let deepPocketsCount = 0; // pockets >= 4mm
 
   patients.forEach((p) => {
-    Object.values(p.periodontogram || {}).forEach((state) => {
+    const UPPER_TEETH = {
+      right: [18, 17, 16, 15, 14, 13, 12, 11],
+      left: [21, 22, 23, 24, 25, 26, 27, 28]
+    };
+    const LOWER_TEETH = {
+      right: [48, 47, 46, 45, 44, 43, 42, 41],
+      left: [31, 32, 33, 34, 35, 36, 37, 38]
+    };
+    const allTeeth = [...Object.values(UPPER_TEETH).flat(), ...Object.values(LOWER_TEETH).flat()];
+
+    allTeeth.forEach((toothNumber) => {
+      // Exclude absent teeth correctly
+      if (p.odontogram?.[toothNumber]?.condition === "ausente") return;
+
       // Evaluate Vestibular: 3 surfaces (mesial, central, distal)
       totalSurfacesEvaluated += 3;
-      if (state.sangradoVestibular?.mesial) bleedingSurfacesCount++;
-      if (state.sangradoVestibular?.central) bleedingSurfacesCount++;
-      if (state.sangradoVestibular?.distal) bleedingSurfacesCount++;
-
-      if (state.placaVestibular?.mesial) plaqueSurfacesCount++;
-      if (state.placaVestibular?.central) plaqueSurfacesCount++;
-      if (state.placaVestibular?.distal) plaqueSurfacesCount++;
-
-      if (state.vestibularPocket?.mesial >= 4) deepPocketsCount++;
-      if (state.vestibularPocket?.central >= 4) deepPocketsCount++;
-      if (state.vestibularPocket?.distal >= 4) deepPocketsCount++;
-
       // Evaluate Palatino/Lingual: 3 surfaces (mesial, central, distal)
       totalSurfacesEvaluated += 3;
-      if (state.sangradoPalatino?.mesial) bleedingSurfacesCount++;
-      if (state.sangradoPalatino?.central) bleedingSurfacesCount++;
-      if (state.sangradoPalatino?.distal) bleedingSurfacesCount++;
 
-      if (state.placaPalatino?.mesial) plaqueSurfacesCount++;
-      if (state.placaPalatino?.central) plaqueSurfacesCount++;
-      if (state.placaPalatino?.distal) plaqueSurfacesCount++;
+      const state = p.periodontogram?.[toothNumber];
+      if (state) {
+        if (state.sangradoVestibular?.mesial) bleedingSurfacesCount++;
+        if (state.sangradoVestibular?.central) bleedingSurfacesCount++;
+        if (state.sangradoVestibular?.distal) bleedingSurfacesCount++;
 
-      if (state.palatinoPocket?.mesial >= 4) deepPocketsCount++;
-      if (state.palatinoPocket?.central >= 4) deepPocketsCount++;
-      if (state.palatinoPocket?.distal >= 4) deepPocketsCount++;
+        if (state.placaVestibular?.mesial) plaqueSurfacesCount++;
+        if (state.placaVestibular?.central) plaqueSurfacesCount++;
+        if (state.placaVestibular?.distal) plaqueSurfacesCount++;
+
+        if (state.vestibularPocket?.mesial >= 4) deepPocketsCount++;
+        if (state.vestibularPocket?.central >= 4) deepPocketsCount++;
+        if (state.vestibularPocket?.distal >= 4) deepPocketsCount++;
+
+        if (state.sangradoPalatino?.mesial) bleedingSurfacesCount++;
+        if (state.sangradoPalatino?.central) bleedingSurfacesCount++;
+        if (state.sangradoPalatino?.distal) bleedingSurfacesCount++;
+
+        if (state.placaPalatino?.mesial) plaqueSurfacesCount++;
+        if (state.placaPalatino?.central) plaqueSurfacesCount++;
+        if (state.placaPalatino?.distal) plaqueSurfacesCount++;
+
+        if (state.palatinoPocket?.mesial >= 4) deepPocketsCount++;
+        if (state.palatinoPocket?.central >= 4) deepPocketsCount++;
+        if (state.palatinoPocket?.distal >= 4) deepPocketsCount++;
+      }
     });
   });
 

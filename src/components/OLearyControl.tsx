@@ -27,14 +27,19 @@ export default function OLearyControl({ patient, onUpdate }: OLearyControlProps)
     let totalSurfaces = 0;
     let plaqueSurfaces = 0;
     
-    Object.values(oLeary).forEach(t => {
-      const isAbsent = patient.odontogram[t.toothNumber]?.condition === "ausente";
+    const allTeeth = [...Object.values(UPPER_TEETH).flat(), ...Object.values(LOWER_TEETH).flat()];
+
+    allTeeth.forEach(toothNum => {
+      const isAbsent = patient.odontogram?.[toothNum]?.condition === "ausente";
       if (!isAbsent) {
         totalSurfaces += 4;
-        if (t.mesial) plaqueSurfaces++;
-        if (t.distal) plaqueSurfaces++;
-        if (t.vestibular) plaqueSurfaces++;
-        if (t.lingual) plaqueSurfaces++;
+        const t = oLeary[toothNum];
+        if (t) {
+          if (t.mesial) plaqueSurfaces++;
+          if (t.distal) plaqueSurfaces++;
+          if (t.vestibular) plaqueSurfaces++;
+          if (t.lingual) plaqueSurfaces++;
+        }
       }
     });
 

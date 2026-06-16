@@ -294,6 +294,20 @@ export default function Odontograma({ odontogram, onChange }: OdontogramaProps) 
         </p>
       </div>
 
+      {/* Visual Guide Legend Block */}
+      <div className="bg-slate-50/40 dark:bg-slate-900/40 rounded-xl p-3 border border-slate-105 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 select-none">
+        <span className="text-[9.5px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider">Código de Hallazgos:</span>
+        <div className="flex flex-wrap items-center gap-4 text-[10.5px] font-bold text-slate-550 dark:text-slate-450">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Caries Activa</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Obturado (Resina)</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-slate-100 border border-emerald-500/30" /> Sano</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 text-red-500 font-black text-center text-[12px] leading-none">&#10006;</span> Ausente / Extracción</span>
+          <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded border-2 border-amber-500 bg-white dark:bg-slate-950 inline-block" /> Corona Protésica</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-3.5 bg-blue-500 inline-block shadow-xs rounded-full" /> Endodoncia</span>
+          <span className="flex items-center gap-1.5"><span className="px-1 py-0.2 bg-teal-600 text-white font-extrabold text-[8px] rounded uppercase">Imp</span> Implante</span>
+        </div>
+      </div>
+
       {/* Main FDI Tooth Chart Layout */}
       <div className="space-y-6 overflow-x-auto pb-4 pt-2">
         

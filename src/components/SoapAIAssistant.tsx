@@ -33,6 +33,9 @@ export default function SoapAIAssistant({ patient, onUpdatePatient, doctorName =
     let totalSites = 0;
 
     Object.values(patient.periodontogram || {}).forEach(p => {
+      // Exclude absent teeth from metrics
+      if (patient.odontogram?.[p.toothNumber]?.condition === "ausente") return;
+
       // Pockets >= 4mm
       if (p.vestibularPocket) {
         if (p.vestibularPocket.mesial >= 4) totalBolsas++;
@@ -85,6 +88,9 @@ export default function SoapAIAssistant({ patient, onUpdatePatient, doctorName =
 
     // Try live Gemini generation first
     try {
+      const activeSpecialty = (patient as any).activeSpecialty || "periodoncia";
+      const specialtyData = (patient as any).specialtyData || {};
+      
       const response = await fetch("/api/dentito", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,27 +98,30 @@ export default function SoapAIAssistant({ patient, onUpdatePatient, doctorName =
           messages: [
             {
               role: "user",
-              content: `Por favor actúa como Especialista Periodoncista Profesional y redacta una Nota Evolutiva SOAP detallada y con el estándar de mayor rigor clínico para el paciente ${patient.name}.
+              content: `Por favor actúa como Especialista Odontólogo en la especialidad de "${activeSpecialty.toUpperCase()}" y redacta una Nota Evolutiva SOAP detallada y con el estándar de mayor rigor clínico para el paciente ${patient.name}.
 
-Parámetros clínicos a considerar:
+Parámetros clínicos generales a considerar:
 - Edad del paciente: ${patient.birthdate ? (new Date().getFullYear() - new Date(patient.birthdate).getFullYear()) : "45"} años.
 - Antecedentes médicos relevantes (Anamnesis): ${JSON.stringify(patient.anamnesis || {})}
 - Total de bolsas periodontales patológicas detectadas (sondaje ≥ 4mm): ${totalBolsas} localizaciones.
 - Sangrado al sondaje (BOP): ${bopIndex}%.
 - Índice de Placa Bacteriana (O'Leary): ${plaqueIndex}%.
 
+Especialidad Activa: ${activeSpecialty.toUpperCase()}
+Datos clínicos específicos de Especialidad: ${JSON.stringify(specialtyData)}
+
 Estructura tu respuesta exactamente bajo estos títulos markdown (usa ###):
 ### [S] Subjetivo
-(Escribe una descripción completa que incluya la actitud del paciente ante su enfermedad, síntomas manifestados en encías y factores de riesgo sistémicos como HTA o tabaquismo activo)
+(Escribe una descripción de los síntomas manifestados, el motivo de consulta según la especialidad de ${activeSpecialty}, factores de riesgo y actitud del paciente)
 
 ### [O] Objetivo
-(Detalla con alta precisión científica el examen periodontal, los índices calculados BOP y Plaque y el recuento de bolsas ≥4mm)
+(Detalla los hallazgos del examen físico, pruebas de vitalidad, mediciones específicas de la especialidad como Angle o conductometría, e índices calculated BOP ${bopIndex}% y Plaque ${plaqueIndex}%)
 
 ### [A] Análisis / Diagnóstico
-(Clasifica el estado periodontal correspondiente según el Consenso AAP/EFP de 2018, especificando Estadio (I, II, III o IV) y Grado (A, B o C) justificando por la edad, el tabaquismo o factores agravantes)
+(Establece el diagnóstico clínico correspondiente, clasificando según el consenso internacional de la especialidad: ya sea AAP 2018 para periodoncia, ICDAS para caries, clasificaciones de maloclusión de Angle para ortodoncia, o patología pulpar para endodoncia de forma rigurosa)
 
 ### [P] Plan de Tratamiento Clínico
-(Sugiere de manera estructurada los pasos a seguir: Instrucción de Técnica de Higiene Oral THO técnica de Bass y seda dental, Raspado y Alisado Radicular RAR, Reevaluación Periodontal, y citas de mantenimiento periodontal)
+(Sugiere de manera estructurada los pasos terapéuticos inmediatos y mediatos de la especialidad de ${activeSpecialty}, pautas de prevención y controles de mantenimiento)
 
 Redacta en un tono extremadamente sofisticado, académico y profesional en español, perfecto para ser adosado al historial médico formal.`
             }
