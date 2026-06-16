@@ -51,7 +51,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Printer,
-  ChevronRight,
   ClipboardList,
   MessageSquare,
   Share2,
