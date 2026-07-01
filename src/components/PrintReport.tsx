@@ -3,6 +3,7 @@ import { Patient } from "../types";
 import { Printer, ShieldCheck, User } from "lucide-react";
 import Odontograma from "./Odontograma";
 import Periodontograma from "./Periodontograma";
+import OLearyControl from "./OLearyControl";
 
 interface PrintReportProps {
   activePatient: Patient | null;
@@ -144,30 +145,52 @@ export default function PrintReport({ activePatient, doctorName, clinicName }: P
              <div className="pointer-events-none scale-90 origin-top-left -ml-4">
                 <Periodontograma 
                   periodontogram={activePatient.periodontogram}
+                  odontogram={activePatient.odontogram}
                   onChange={(v) => console.log(v)}
+                />
+             </div>
+           </section>
+
+           {/* O'Leary Index Summary */}
+           <section className="print:break-inside-avoid">
+             <h3 className="font-bold text-xl border-b border-slate-200 pb-2 mb-4 font-display">3. Mapa de Higiene - Índice O'Leary</h3>
+             <div className="pointer-events-none scale-90 origin-top-left -ml-4">
+                <OLearyControl 
+                  patient={activePatient}
+                  onUpdate={(v) => console.log(v)}
                 />
              </div>
            </section>
 
            {/* Treatment summary */}
            <section className="print:break-inside-avoid">
-             <h3 className="font-bold text-xl border-b border-slate-200 pb-2 mb-4 font-display">3. Resumen de Plan de Tratamiento</h3>
+             <h3 className="font-bold text-xl border-b border-slate-200 pb-2 mb-4 font-display">4. Resumen de Plan de Tratamiento</h3>
              <table className="w-full text-left border-collapse text-sm">
                <thead>
                  <tr className="bg-slate-100">
-                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-32">Fase</th>
+                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-24">Fase</th>
+                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-16">Pieza</th>
                    <th className="border border-slate-300 p-2 uppercase text-xs font-bold">Procedimiento</th>
-                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-24 text-right">Costo</th>
+                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-24 text-right">Valor Base</th>
+                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-16 text-right">Dto(%)</th>
+                   <th className="border border-slate-300 p-2 uppercase text-xs font-bold w-24 text-right">Subtotal</th>
                  </tr>
                </thead>
                <tbody>
-                  {activePatient.treatmentPlan?.procedures.map(p => (
+                  {activePatient.treatmentPlan?.procedures.map(p => {
+                    const discountValue = p.discount || 0;
+                    const subtotal = Math.round(p.cost * (1 - (discountValue / 100)));
+                    return (
                     <tr key={p.id}>
                       <td className="border border-slate-300 p-2 text-slate-500 text-xs">{p.phase}</td>
-                      <td className="border border-slate-300 p-2 font-medium">{p.description}</td>
-                      <td className="border border-slate-300 p-2 font-mono text-right">${p.cost.toLocaleString()}</td>
+                      <td className="border border-slate-300 p-2 font-mono text-xs">{p.tooth || '-'}</td>
+                      <td className="border border-slate-300 p-2 font-medium">{p.description} {p.surface ? `(${p.surface})` : ''}</td>
+                      <td className="border border-slate-300 p-2 font-mono text-right text-slate-500">${p.cost.toLocaleString('es-CL')}</td>
+                      <td className="border border-slate-300 p-2 font-mono text-right text-rose-500">{discountValue > 0 ? `-${discountValue}%` : '-'}</td>
+                      <td className="border border-slate-300 p-2 font-mono text-right font-bold">${subtotal.toLocaleString('es-CL')}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                </tbody>
              </table>
            </section>

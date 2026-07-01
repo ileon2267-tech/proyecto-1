@@ -29,7 +29,7 @@ const DENTITO_KNOWLEDGE: Record<string, string> = {
   "gingivitis": "La gingivitis es una inflamación reversible de la encía, inducida por placa bacteriana, sin pérdida de inserción.",
   "amoxicilina": "Antibiótico beta-lactámico de amplio espectro. Dosis habitual: 500mg - 875mg c/8h por 7 días.",
   "clorhexidina": "Antiséptico bisbiguanida. Uso en odontología usualmente al 0.12% en colutorios.",
-  "dentito": "Soy Dentito v15, tu asistente IA holográfico para PerioDash. Puedo guiarte por protocolos médicos, registrar notas o buscar pacientes."
+  "dentito": "Soy Dentito, el asistente clínico inteligente integrado en PerioDash. Puedo apoyarte en la búsqueda de expedientes, análisis periodontal y protocolos clínicos."
 };
 
 const ParticleSystem = () => {
@@ -135,19 +135,19 @@ export default function DentitoChat({
   const triggerFileScan = (fileName: string, type: string, size: string) => {
     setShowAttachmentMenu(false);
     setIsAnalyzingFile(true);
-    setFileScanLogs(["🌐 Estableciendo conexión cuántica con el servidor central...", "🧬 Cargando segmentador de histología dental..."]);
+    setFileScanLogs(["🌐 Estableciendo conexión segura con la base de datos...", "🧬 Cargando motor de análisis clínico periodontal..."]);
     
     // Add logs step by step
     setTimeout(() => {
-      setFileScanLogs(prev => [...prev, "🔍 Escaneando imagen/archivo: " + fileName + " (" + size + ")..."]);
+      setFileScanLogs(prev => [...prev, "🔍 Procesando documento: " + fileName + " (" + size + ")..."]);
     }, 450);
     
     setTimeout(() => {
-      setFileScanLogs(prev => [...prev, "🧠 Aplicando clasificador visual y de lenguaje clínico..."]);
+      setFileScanLogs(prev => [...prev, "🧠 Aplicando validación y reconocimiento semántico de hallazgos..."]);
     }, 900);
     
     setTimeout(() => {
-      setFileScanLogs(prev => [...prev, "📋 Correlacionando con el expediente clínico de " + (activePatient?.name || "paciente") + "..."]);
+      setFileScanLogs(prev => [...prev, "📋 Vinculando resultados con el expediente clínico de " + (activePatient?.name || "paciente") + "..."]);
     }, 1350);
 
     setTimeout(() => {
@@ -266,7 +266,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
     {
       id: "init-1",
       role: "assistant",
-      content: "¡Hola! Soy **Dentito v15 Pro**, tu IA clínica asistencial. Puedo analizar gráficos periodontales en tiempo real, guiarte en protocolos de emergencias médicas severas o navegar por PerioDash rápidamente.",
+      content: "¡Hola! Soy **Dentito**, tu asistente clínico digital. Puedo ayudarte a analizar mapas periodontales en tiempo real, guiarte en protocolos de emergencias médicas en odontología o navegar rápidamente por las herramientas de PerioDash.",
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -687,9 +687,9 @@ He completado el análisis espectrográfico e interpretación semántica del arc
 
     // 4. Chit Chat
     if (raw.includes("hola") || raw.includes("buenos dias") || raw.includes("buenas tardes")) {
-      return `¡Hola doctor(a)! Soy **Dentito Pro v15**, tu asistente clínico omnisciente de PerioDash. Estoy conectado con la base de datos de expedientes (odonto/periodontograma) de la clínica. ¿En qué te puedo asesorar hoy?
+      return `¡Hola doctor(a)! Soy **Dentito**, tu asistente clínico digital en PerioDash. Estoy conectado con el historial clínico y los datos del periodontograma de la consulta. ¿En qué te puedo asesorar hoy?
       
-*Puedes pedirme cosas como: "Analizar paciente", "Citas hoy", "Clases de Angle", "Precios de la clínica" o incluso adjuntar y examinar archivos de radiografías aquí abajo.*`;
+*Puedes pedirme cosas como: "Analizar paciente", "Citas hoy", "Clases de Angle", "Precios de la clínica" o examinar archivos de radiografías aquí abajo.*`;
     }
     if (raw.includes("chiste") || raw.includes("broma")) {
       return "¿Por qué los dentistas se sienten solos? ¡Porque siempre están buscando un 'buen diente'! 🥁 Oye, ¿sabías que la bacteria *Porphyromonas gingivalis* es la enemiga número uno del periodonto? ¡Esa sí que no es un chiste para las encías de tus pacientes!";
@@ -970,7 +970,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
       >
         {isMinimized ? (
           <div 
-            title="Dentito AI - Toca para asistencia"
+            title="Asistente Dentito - Soporte Clínico"
             className="w-full h-full flex items-center justify-center cursor-pointer relative group"
           >
              <div className="relative w-12 h-12 flex items-center justify-center rounded-full p-[1.5px] shadow-sm">
@@ -998,12 +998,12 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                    </div>
                 </div>
                 <div>
-                  <h4 className="font-display font-extrabold text-sm text-slate-800 dark:text-white tracking-tight inline-flex items-center gap-1.5">
-                    <span>Dentito AI</span>
-                    <span className="font-mono text-teal-500 text-[10px] bg-teal-500/10 px-1.5 py-0.5 rounded-sm">v15 Pro</span>
+                  <h4 className="font-display font-bold text-sm text-slate-800 dark:text-white tracking-tight inline-flex items-center gap-1.5">
+                    <span>Asistente Clínico</span>
+                    <span className="font-mono text-teal-600 dark:text-teal-400 text-[10px] bg-teal-500/10 px-1.5 py-0.5 rounded-sm">Dentito</span>
                   </h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Asistente Cuántico Clínico</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Asistente de Fichas e Historiales</span>
                     {activePatient && (
                       <span className="inline-flex items-center gap-1 text-[8px] uppercase tracking-wider px-1.5 py-0.2 bg-teal-500/10 text-teal-600 dark:text-teal-400 font-black rounded border border-teal-500/15 select-none shrink-0">
                         <span className="relative flex h-1 w-1 shrink-0">

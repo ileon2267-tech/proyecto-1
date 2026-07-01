@@ -32,14 +32,14 @@
 .neon-rainbow-bg {
   background: linear-gradient(
     90deg,
-    #00ffcc, 
-    #00bfff, 
-    #a200ff,
-    #ff00aa, 
-    #00ffcc 
+    #0d9488, 
+    #06b6d4, 
+    #10b981,
+    #0284c7, 
+    #0d9488 
   );
   background-size: 200% auto;
-  animation: neon-flow 4s linear infinite;
+  animation: neon-flow 6s linear infinite;
 }
 
 .neon-intense-glow {

@@ -59,7 +59,11 @@ import {
   LogOut,
   ShoppingBag,
   User,
-  Briefcase
+  Briefcase,
+  Smile,
+  TrendingUp,
+  HeartPulse,
+  Columns
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -159,7 +163,7 @@ export default function App() {
 
   const [activePatientId, setActivePatientId] = useState<string>(() => {
     const saved = localStorage.getItem("perioActivePatientId");
-    return saved || "pat-1"; // Carlos Mendoza by default
+    return saved || ""; // No default patient selected initially
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
@@ -171,6 +175,23 @@ export default function App() {
   const [doctorName, setDoctorName] = useState("Dr. Ignacio León");
   const [clinicName, setClinicName] = useState("PerioClinic Providencia");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isClinicalSidebarCollapsed, setIsClinicalSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem("perioClinicalSidebarCollapsed") === "true";
+  });
+  const [isZenMode, setIsZenMode] = useState<boolean>(() => {
+    return localStorage.getItem("perioZenMode") === "true";
+  });
+
+  const effectiveSidebarCollapsed = isZenMode ? true : isSidebarCollapsed;
+  const effectiveClinicalSidebarCollapsed = isZenMode ? true : isClinicalSidebarCollapsed;
+
+  const toggleClinicalSidebar = () => {
+    setIsClinicalSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem("perioClinicalSidebarCollapsed", String(next));
+      return next;
+    });
+  };
 
   // Patient Registration Form states
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -191,6 +212,18 @@ export default function App() {
   // Keep track of previously synced patients and appointments to do differential synchronization
   const prevPatientsRef = useRef<Patient[]>([]);
   const prevAppointmentsRef = useRef<Appointment[]>([]);
+
+  // Navigation scroll ref
+  const clinicalNavRef = useRef<HTMLDivElement>(null);
+  const scrollClinicalNav = (direction: "left" | "right") => {
+    if (clinicalNavRef.current) {
+      const scrollAmount = 300;
+      clinicalNavRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth"
+      });
+    }
+  };
 
   // Validate Firestore Connection
   useEffect(() => {
@@ -227,10 +260,10 @@ export default function App() {
         if (dbPatients.length > 0) {
           setPatients(dbPatients);
           prevPatientsRef.current = dbPatients;
-          if (dbPatients.some(p => p.id === activePatientId)) {
+          if (activePatientId && dbPatients.some(p => p.id === activePatientId)) {
             // Keep current
           } else {
-            setActivePatientId(dbPatients[0].id);
+            setActivePatientId("");
           }
         } else {
           // SEED FIRST TIME
@@ -375,6 +408,16 @@ export default function App() {
     return () => window.removeEventListener("periodash-navigate", handleNavigateEvent);
   }, []);
 
+  // Auto Zen Mode for Complex Clinical Views
+  useEffect(() => {
+    if (clinicalSubView === "odontograma" || clinicalSubView === "periodontograma") {
+      setIsZenMode(true);
+      localStorage.setItem("perioZenMode", "true");
+      setIsSidebarCollapsed(true);
+      setIsClinicalSidebarCollapsed(true);
+    }
+  }, [clinicalSubView]);
+
   const activePatient = patients.find((p) => p.id === activePatientId) || null;
 
   // Patient Registration Handlers
@@ -502,35 +545,65 @@ export default function App() {
     return (
       <div className="space-y-6 animate-fade-in" id="clinical-area">
             {/* Active Patient Bar */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-4 sm:p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 bg-teal-50 dark:bg-teal-800 text-teal-600 dark:text-teal-450 rounded-2xl flex items-center justify-center font-display font-extrabold text-xl shadow-xs border border-teal-100 dark:border-teal-900/40">
+                <div className="w-12 h-12 bg-teal-50 dark:bg-teal-800 text-teal-600 dark:text-teal-450 rounded-2xl flex items-center justify-center font-display font-extrabold text-xl shadow-xs border border-teal-100 dark:border-teal-900/40 flex-shrink-0">
                   {activePatient ? activePatient.name.charAt(0) : "?"}
                 </div>
-                <div>
-                  <h2 className="text-lg font-display font-bold text-slate-900 dark:text-white leading-tight">
-                    {activePatient ? activePatient.name : "Seleccionar Paciente"}
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-1 font-normal">
-                    {activePatient 
-                      ? `✉️ ${activePatient.email}  |  📞 ${activePatient.phone}  |  🎂 Nacimiento: ${activePatient.birthdate}` 
-                      : "Sincroniza un expediente clínico existente..."}
-                  </p>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-display font-bold text-slate-900 dark:text-white leading-tight truncate">
+                      {activePatient ? activePatient.name : "Seleccionar Paciente"}
+                    </h2>
+                    {activePatient && (
+                      <div className="flex flex-wrap gap-1">
+                        {activePatient.anamnesis.hta && (
+                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-600 dark:text-rose-405 rounded-md border border-rose-500/20 shadow-xs" title="Hipertensión Arterial Activa">HTA</span>
+                        )}
+                        {activePatient.anamnesis.diabetes && (
+                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-650 dark:text-amber-400 rounded-md border border-amber-500/20 shadow-xs" title="Diabetes Mellitus">DBT</span>
+                        )}
+                        {activePatient.anamnesis.tabaquismo > 0 && (
+                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-650 dark:text-slate-305 rounded-md border border-slate-500/20 shadow-xs" title={`Tabaquismo: ${activePatient.anamnesis.tabaquismo} cigarrillos por día`}>TBQ</span>
+                        )}
+                        {activePatient.anamnesis.alergias && (
+                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-yellow-500/10 text-yellow-750 dark:text-yellow-400 rounded-md border border-yellow-500/20 shadow-xs max-w-[80px] truncate" title={`Alergias: ${activePatient.anamnesis.alergias}`}>ALG</span>
+                        )}
+                        {isZenMode && (
+                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-white rounded-md border border-emerald-500/20 shadow-sm animate-pulse">Zen</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1 font-normal">
+                    {activePatient ? (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="inline-flex items-center gap-1">✉️ <span className="truncate max-w-[120px] sm:max-w-none">{activePatient.email}</span></span>
+                        <span className="text-slate-300 dark:text-slate-850">|</span>
+                        <span>📞 {activePatient.phone}</span>
+                        <span className="hidden sm:inline text-slate-300 dark:text-slate-850">|</span>
+                        <span className="hidden sm:inline">🎂 {activePatient.birthdate}</span>
+                      </div>
+                    ) : (
+                      "Sincroniza un expediente clínico existente..."
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Patient selections dropdown */}
-              <div className="flex gap-2.5 items-center w-full lg:w-auto">
+              <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
                 <button
                   onClick={() => setActivePatientId("")}
-                  className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center cursor-pointer shadow-sm"
+                  className="px-3 py-2 sm:px-3.5 sm:py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center cursor-pointer shadow-sm"
                 >
-                  Volver al Directorio
+                  <span>Volver</span>
+                  <span className="hidden sm:inline">&nbsp;al Directorio</span>
                 </button>
                 <select
                   value={activePatientId}
                   onChange={(e) => setActivePatientId(e.target.value)}
-                  className="w-full lg:w-56 text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80 rounded-xl text-slate-800 dark:text-slate-200 focus:focus:ring-2 focus:ring-teal-500/25 outline-none"
+                  className="flex-1 lg:flex-initial lg:w-56 text-xs p-2 sm:p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80 rounded-xl text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500/25 outline-none"
                 >
                   <option value="">Buscar expediente...</option>
                   {patients.map((p) => (
@@ -541,20 +614,46 @@ export default function App() {
                 </select>
 
                 <button
+                  onClick={() => {
+                    const nextZen = !isZenMode;
+                    setIsZenMode(nextZen);
+                    localStorage.setItem("perioZenMode", String(nextZen));
+                    if (nextZen) {
+                      setIsSidebarCollapsed(true);
+                      setIsClinicalSidebarCollapsed(true);
+                    } else {
+                      setIsSidebarCollapsed(false);
+                      setIsClinicalSidebarCollapsed(false);
+                    }
+                  }}
+                  className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                    isZenMode
+                      ? "bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-550/30 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-950/10"
+                      : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/85 text-slate-700 dark:text-slate-300 border-transparent"
+                  }`}
+                  title={isZenMode ? "Desactivar Modo Zen (Espacio Normal)" : "Activar Modo Zen (Espacio Completo)"}
+                >
+                  <Columns className={`w-4 h-4 transition-transform duration-300 ${isZenMode ? "rotate-90 text-emerald-500" : "text-slate-400"}`} />
+                  <span>{isZenMode ? "Modo Zen" : "Espacio Ampliado"}</span>
+                </button>
+
+                <button
                   onClick={() => setActiveTab("reportes")}
-                  className="p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/65 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800/60 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-bold"
+                  className="p-2 sm:p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/65 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800/60 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-bold"
                   title="Configurar y Generar Reporte A4"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>Reporte A4</span>
+                  <span className="hidden xs:inline">Reporte A4</span>
+                  <span className="xs:hidden">A4</span>
                 </button>
                 <button
                   onClick={() => setShowShareModal(true)}
-                  className="px-3.5 py-2.5 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-600 dark:text-teal-400 font-extrabold text-xs rounded-xl border border-teal-500/40 dark:border-teal-400/50 shadow-[0_0_12px_rgba(20,184,166,0.22)] hover:shadow-[0_0_18px_rgba(20,184,166,0.38)] hover:scale-[1.01] transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-2.5 py-2 sm:px-3.5 sm:py-2.5 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-600 dark:text-teal-400 font-extrabold text-xs rounded-xl border border-teal-500/40 dark:border-teal-400/50 shadow-[0_0_12px_rgba(20,184,166,0.22)] hover:shadow-[0_0_18px_rgba(20,184,166,0.38)] hover:scale-[1.01] transition-all flex items-center gap-2 cursor-pointer"
                   title="Generar Enlace Seguro"
                 >
                   <Share2 className="w-4 h-4 text-teal-500 animate-pulse" />
-                  Paciente
+                  <span className="hidden xs:inline">Paciente</span>
+                  <span className="xs:hidden">Compartir</span>
                 </button>
               </div>
             </div>
@@ -563,74 +662,76 @@ export default function App() {
               <div className="space-y-6 font-display">
                 
                 {/* Clinical Alerts and Systemic Highlights Strip */}
-                <div className="bg-slate-50/80 dark:bg-slate-900/65 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs select-none">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-teal-500/10 rounded-xl border border-teal-500/20">
-                      <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-450" />
+                {!isZenMode && (
+                  <div className="bg-slate-50/80 dark:bg-slate-900/65 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs select-none">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-teal-500/10 rounded-xl border border-teal-500/20">
+                        <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-450" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-none">Radar de Alertas Sistémicas</h4>
+                        <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-bold mt-1">Estado clínico actual relevante para cirugías y sondajes periodontales.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-none">Radar de Alertas Sistémicas</h4>
-                      <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-bold mt-1">Estado clínico actual relevante para cirugías y sondajes periodontales.</p>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {/* HTA Alert */}
+                      {activePatient.anamnesis.hta && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-red-500/10 text-red-650 dark:text-red-400 rounded-full border border-red-500/20 shadow-xs animate-pulse">
+                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                          HTA Activa
+                        </span>
+                      )}
+
+                      {/* Diabetes Alert */}
+                      {activePatient.anamnesis.diabetes ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold rounded-full border shadow-xs ${
+                          activePatient.anamnesis.diabetesStatus === 'severe'
+                            ? "bg-rose-500/10 text-rose-650 dark:text-rose-455 border-rose-500/20 animate-pulse"
+                            : "bg-amber-500/10 text-amber-650 dark:text-amber-400 border-amber-500/20"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${activePatient.anamnesis.diabetesStatus === 'severe' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                          Diabetes {activePatient.anamnesis.diabetesStatus === 'severe' ? 'Descompensada' : 'Controlada'}
+                        </span>
+                      ) : null}
+
+                      {/* Smoking Alert */}
+                      {activePatient.anamnesis.tabaquismo > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-slate-500/10 text-slate-650 dark:text-slate-300 rounded-full border border-slate-500/20">
+                          🚬 {activePatient.anamnesis.tabaquismo} cig./día
+                        </span>
+                      ) : null}
+
+                      {/* Allergies Alert */}
+                      {activePatient.anamnesis.alergias ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-yellow-500/10 text-yellow-750 dark:text-yellow-400 rounded-full border border-yellow-500/20 max-w-[200px]" title={activePatient.anamnesis.alergias}>
+                          ⚠️ Alergias: {activePatient.anamnesis.alergias}
+                        </span>
+                      ) : null}
+
+                      {/* Current Pain Alert */}
+                      {activePatient.anamnesis.dolorActual && activePatient.anamnesis.dolorActual !== "ninguno" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-orange-500/10 text-orange-655 dark:text-orange-400 rounded-full border border-orange-500/20">
+                          🔥 Dolor: {activePatient.anamnesis.dolorActual.toUpperCase()}
+                        </span>
+                      )}
+
+                      {/* Safe State indicator fallback */}
+                      {!activePatient.anamnesis.hta && !activePatient.anamnesis.diabetes && activePatient.anamnesis.tabaquismo === 0 && !activePatient.anamnesis.alergias && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 rounded-full border border-emerald-500/20 shadow-xs">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                          Sistémicamente Sano
+                        </span>
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {/* HTA Alert */}
-                    {activePatient.anamnesis.hta && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-red-500/10 text-red-650 dark:text-red-400 rounded-full border border-red-500/20 shadow-xs animate-pulse">
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                        HTA Activa
-                      </span>
-                    )}
-
-                    {/* Diabetes Alert */}
-                    {activePatient.anamnesis.diabetes ? (
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold rounded-full border shadow-xs ${
-                        activePatient.anamnesis.diabetesStatus === 'severe'
-                          ? "bg-rose-500/10 text-rose-650 dark:text-rose-455 border-rose-500/20 animate-pulse"
-                          : "bg-amber-500/10 text-amber-650 dark:text-amber-400 border-amber-500/20"
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${activePatient.anamnesis.diabetesStatus === 'severe' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                        Diabetes {activePatient.anamnesis.diabetesStatus === 'severe' ? 'Descompensada' : 'Controlada'}
-                      </span>
-                    ) : null}
-
-                    {/* Smoking Alert */}
-                    {activePatient.anamnesis.tabaquismo > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-slate-500/10 text-slate-650 dark:text-slate-300 rounded-full border border-slate-500/20">
-                        🚬 {activePatient.anamnesis.tabaquismo} cig./día
-                      </span>
-                    ) : null}
-
-                    {/* Allergies Alert */}
-                    {activePatient.anamnesis.alergias ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-yellow-500/10 text-yellow-750 dark:text-yellow-400 rounded-full border border-yellow-500/20 max-w-[200px]" title={activePatient.anamnesis.alergias}>
-                        ⚠️ Alergias: {activePatient.anamnesis.alergias}
-                      </span>
-                    ) : null}
-
-                    {/* Current Pain Alert */}
-                    {activePatient.anamnesis.dolorActual && activePatient.anamnesis.dolorActual !== "ninguno" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-orange-500/10 text-orange-655 dark:text-orange-400 rounded-full border border-orange-500/20">
-                        🔥 Dolor: {activePatient.anamnesis.dolorActual.toUpperCase()}
-                      </span>
-                    )}
-
-                    {/* Safe State indicator fallback */}
-                    {!activePatient.anamnesis.hta && !activePatient.anamnesis.diabetes && activePatient.anamnesis.tabaquismo === 0 && !activePatient.anamnesis.alergias && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 rounded-full border border-emerald-500/20 shadow-xs">
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                        Sistémicamente Sano
-                      </span>
-                    )}
-                  </div>
-                </div>
+                )}
                 
                 {/* Responsive Clinical Layout Container */}
-                <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
+                <div className={`grid grid-cols-1 ${effectiveClinicalSidebarCollapsed ? "lg:grid-cols-1" : "lg:grid-cols-[280px_1fr]"} gap-6 items-start transition-all duration-300`}>
                   
                   {/* SIDEBAR NAVIGATION CONTROL PANEL */}
-                  <div className="space-y-4">
+                  <div className={`space-y-4 ${effectiveClinicalSidebarCollapsed ? "lg:hidden" : ""}`}>
                     
                     {/* Desktop Sidebar Control Panel */}
                     <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-4">
@@ -643,10 +744,13 @@ export default function App() {
                             Estaciones de Trabajo
                           </p>
                         </div>
-                        <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
-                        </span>
+                        <button
+                          onClick={toggleClinicalSidebar}
+                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 transition-all cursor-pointer flex items-center justify-center"
+                          title="Contraer panel de estaciones"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-slate-500 dark:text-slate-450" />
+                        </button>
                       </div>
                       
                       <div className="space-y-4">
@@ -761,14 +865,17 @@ export default function App() {
                     {/* Mobile Category & Responsive sub-views Selector */}
                     <div className="block lg:hidden space-y-3.5">
                       {/* Responsive Core Segments */}
-                      <div className="grid grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                      <div className="grid grid-cols-4 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-800">
                         {[
+                          { id: "administracion", label: "Ficha", icon: User, defaultItem: "ficha" },
                           { id: "evaluacion", label: "Diagnóstico", icon: Stethoscope, defaultItem: "especialidad" },
                           { id: "periodoncia", label: "Periodoncia", icon: Activity, defaultItem: "periodontograma" },
                           { id: "gestion", label: "Copiloto & Planes", icon: Sparkles, defaultItem: "soap" }
                         ].map(cat => {
                           const Icon = cat.icon;
-                          const itemsOfCat = cat.id === "evaluacion" 
+                          const itemsOfCat = cat.id === "administracion"
+                            ? ["ficha"]
+                            : cat.id === "evaluacion" 
                             ? ["especialidad", "odontograma", "xrays"] 
                             : cat.id === "periodoncia" 
                             ? ["periodontograma", "pra", "oleary"] 
@@ -780,7 +887,7 @@ export default function App() {
                             <button
                               key={cat.id}
                               onClick={() => setClinicalSubView(cat.defaultItem as any)}
-                              className={`py-2 px-1.5 rounded-xl text-[10px] font-black tracking-wide transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer border ${
+                              className={`py-2 px-1 rounded-xl text-[10px] font-black tracking-wide transition-all flex flex-col items-center justify-center gap-1 cursor-pointer border ${
                                 isActive
                                   ? "bg-white dark:bg-slate-900 border-slate-200/50 dark:border-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
                                   : "text-slate-550 dark:text-slate-400 hover:text-slate-800 border-transparent"
@@ -796,6 +903,12 @@ export default function App() {
                       {/* Second tier pills filtered by Category */}
                       <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pb-1">
                         {[
+                          {
+                            id: "administracion",
+                            items: [
+                              { id: "ficha", label: "Ficha & Anamnesis" }
+                            ]
+                          },
                           {
                             id: "evaluacion",
                             items: [
@@ -820,7 +933,9 @@ export default function App() {
                             ]
                           }
                         ].find(c => {
-                          const activeCategoryString = ["especialidad", "odontograma", "xrays"].includes(clinicalSubView)
+                          const activeCategoryString = clinicalSubView === "ficha"
+                            ? "administracion"
+                            : ["especialidad", "odontograma", "xrays"].includes(clinicalSubView)
                             ? "evaluacion"
                             : ["periodontograma", "pra", "oleary"].includes(clinicalSubView)
                             ? "periodoncia"
@@ -875,7 +990,104 @@ export default function App() {
                   </div>
                   
                   {/* CENTRAL ACTIVE WORKSPACE COMPONENT PANEL */}
-                  <div className="min-w-0 bg-white/40 dark:bg-slate-900/5 rounded-2xl">
+                  <div className="min-w-0 bg-white/40 dark:bg-slate-900/5 rounded-2xl flex flex-col gap-5">
+                    {/* Estaciones Clínicas - Selector de Acceso Directo Horizontal Rápido */}
+                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/80 p-1.5 rounded-2xl flex items-center gap-1 shadow-xs">
+                      <button 
+                        onClick={() => scrollClinicalNav('left')}
+                        className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors shrink-0 cursor-pointer hidden sm:flex"
+                        title="Desplazar a la izquierda"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <div 
+                        ref={clinicalNavRef}
+                        className="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 shrink-0 select-none scroll-smooth px-1"
+                      >
+                        {/* Alternador de Menú Lateral para Desktop */}
+                        <button
+                          onClick={toggleClinicalSidebar}
+                          className={`hidden lg:flex px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-all duration-200 items-center gap-2 cursor-pointer border shrink-0 ${
+                            !effectiveClinicalSidebarCollapsed
+                              ? "bg-slate-50/60 hover:bg-slate-100/80 dark:bg-slate-800/20 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400"
+                              : "bg-teal-500/10 hover:bg-teal-500/20 border-teal-500/20 text-teal-655 dark:text-teal-400 font-extrabold"
+                          }`}
+                          title={effectiveClinicalSidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
+                        >
+                          <Columns className={`w-3.5 h-3.5 ${effectiveClinicalSidebarCollapsed ? "text-teal-500" : ""}`} />
+                          <span>{effectiveClinicalSidebarCollapsed ? "Mostrar Menú" : "Contraer Menú"}</span>
+                        </button>
+
+                        {/* Modo Zen Quick Toggle */}
+                        <button
+                          onClick={() => {
+                            const nextZen = !isZenMode;
+                            setIsZenMode(nextZen);
+                            localStorage.setItem("perioZenMode", String(nextZen));
+                            if (nextZen) {
+                              setIsSidebarCollapsed(true);
+                              setIsClinicalSidebarCollapsed(true);
+                            } else {
+                              setIsSidebarCollapsed(false);
+                              setIsClinicalSidebarCollapsed(false);
+                            }
+                          }}
+                          className={`hidden lg:flex px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-all duration-200 items-center gap-2 cursor-pointer border shrink-0 ${
+                            isZenMode
+                              ? "bg-emerald-500/15 border-emerald-550/35 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-950/10 animate-pulse"
+                              : "bg-slate-50/60 hover:bg-slate-100/80 dark:bg-slate-800/20 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400"
+                          }`}
+                          title={isZenMode ? "Salir de Modo Zen (Espacio Normal)" : "Activar Modo Zen (Espacio Completo)"}
+                        >
+                          <Sparkles className={`w-3.5 h-3.5 ${isZenMode ? "text-emerald-500" : "text-slate-400"}`} />
+                          <span>{isZenMode ? "Modo Zen Activo" : "Modo Zen"}</span>
+                        </button>
+
+                        {[
+                          { id: "ficha", label: "Ficha & Anamnesis", icon: User, badge: "Anamnesis", color: "border-blue-500/20 text-blue-600 dark:text-blue-400" },
+                          { id: "especialidad", label: "Consola Especialidades", icon: Stethoscope, badge: "Espec", color: "border-teal-500/20 text-teal-600 dark:text-teal-400" },
+                          { id: "odontograma", label: "Odontograma", icon: Smile, badge: "Dental", color: "border-pink-500/20 text-pink-600 dark:text-pink-400" },
+                          { id: "periodontograma", label: "Periodontograma", icon: Activity, badge: "Encías", color: "border-emerald-500/20 text-emerald-600 dark:text-emerald-400" },
+                          { id: "pra", label: "Riesgo PRA", icon: TrendingUp, badge: "Análisis", color: "border-rose-500/20 text-rose-650 dark:text-rose-450" },
+                          { id: "oleary", label: "Índice O'Leary", icon: ClipboardList, badge: "Placa", color: "border-amber-500/20 text-amber-600 dark:text-amber-450" },
+                          { id: "xrays", label: "Tomografías", icon: HeartPulse, badge: "Rx", color: "border-sky-500/20 text-sky-600 dark:text-sky-400" },
+                          { id: "soap", label: "Redactor SOAP AI", icon: Sparkles, badge: "Copiloto", color: "border-indigo-500/20 text-indigo-600 dark:text-indigo-400" },
+                          { id: "presupuesto", label: "Presupuestos", icon: Banknote, badge: "Planes", color: "border-purple-500/20 text-purple-600 dark:text-purple-400" }
+                        ].map(st => {
+                          const IconComponent = st.icon;
+                          const isStationActive = clinicalSubView === st.id;
+                          return (
+                            <button
+                              key={st.id}
+                              onClick={() => setClinicalSubView(st.id as any)}
+                              className={`px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-all duration-150 flex items-center gap-2 whitespace-nowrap cursor-pointer border shrink-0 ${
+                                isStationActive
+                                  ? "bg-teal-600 border-teal-600 text-white shadow-sm scale-102"
+                                  : "bg-white/60 dark:bg-slate-900/50 border-slate-200/50 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                              }`}
+                            >
+                              <IconComponent className={`w-3.5 h-3.5 ${isStationActive ? 'text-white' : 'text-slate-400'}`} />
+                              <span>{st.label}</span>
+                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                                isStationActive 
+                                  ? 'bg-white/20 text-white' 
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-450 dark:text-slate-500'
+                              }`}>
+                                {st.badge}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button 
+                        onClick={() => scrollClinicalNav('right')}
+                        className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors shrink-0 cursor-pointer hidden sm:flex"
+                        title="Desplazar a la derecha"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={clinicalSubView}
@@ -1519,29 +1731,39 @@ export default function App() {
       )}
 
       {/* SIDEBAR ON DESKTOP - HIDDEN ON MOBILE */}
-      <aside className={`${isSidebarCollapsed ? "w-20" : "w-64"} bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-100 dark:border-slate-800/50 flex flex-col py-6 sticky top-0 h-screen hidden md:flex shrink-0 no-print z-10 transition-[width] duration-300 overflow-y-auto overflow-x-hidden scrollbar-none relative`}>
+      <aside className={`${effectiveSidebarCollapsed ? "w-20" : "w-64"} bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-100 dark:border-slate-800/50 flex flex-col py-6 sticky top-0 h-screen hidden md:flex shrink-0 no-print z-10 transition-[width] duration-300 overflow-y-auto overflow-x-hidden scrollbar-none relative`}>
         
         {/* Toggle Button */}
         <button 
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onClick={() => {
+            if (isZenMode) {
+              setIsZenMode(false);
+              localStorage.setItem("perioZenMode", "false");
+              setIsSidebarCollapsed(false);
+              setIsClinicalSidebarCollapsed(false);
+            } else {
+              setIsSidebarCollapsed(!isSidebarCollapsed);
+            }
+          }}
           className="absolute top-7 right-3 w-6 h-6 bg-slate-100 hover:bg-teal-100 dark:bg-slate-800 dark:hover:bg-teal-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 rounded-lg flex items-center justify-center cursor-pointer transition-colors z-20"
+          title={isZenMode ? "Salir de Modo Zen" : "Contraer barra lateral"}
         >
-          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          {effectiveSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
 
         {/* Brand Header */}
-        <div className={`px-5 pb-5 border-b border-slate-50 dark:border-slate-800 flex items-center gap-4 transition-all ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
-          <Logo className={`shrink-0 ${isSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`} showNeon={true} />
-          {!isSidebarCollapsed && (
+        <div className={`px-5 pb-5 border-b border-slate-50 dark:border-slate-800 flex items-center gap-4 transition-all ${effectiveSidebarCollapsed ? 'justify-center px-0' : ''}`}>
+          <Logo className={`shrink-0 ${effectiveSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`} showNeon={true} />
+          {!effectiveSidebarCollapsed && (
             <div className="whitespace-nowrap overflow-hidden">
               <h1 className="font-display font-bold text-base leading-none text-slate-900 dark:text-white mb-[2px]">PerioDash</h1>
-              <span className="text-[10px] text-teal-600 dark:text-teal-400 font-extrabold tracking-widest uppercase">v15 Pro Edition</span>
+              <span className="text-[10px] text-teal-650 dark:text-teal-450 font-bold tracking-wider uppercase">Clinical Suite</span>
             </div>
           )}
         </div>
 
         {/* Doctor Identity Context Card */}
-        {!isSidebarCollapsed && (
+        {!effectiveSidebarCollapsed && (
           <div className="mx-4 my-4 bg-slate-50/70 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1 flex items-center gap-2.5 whitespace-nowrap overflow-hidden transition-all duration-300">
             <div className="w-9 h-9 rounded-xl bg-slate-900 text-slate-100 flex items-center justify-center text-xs font-bold shrink-0 font-mono shadow-xs border border-slate-800">
               DR
@@ -1554,16 +1776,16 @@ export default function App() {
         )}
 
         {/* Quick Search Trigger Pill */}
-        <div className={`px-4 ${isSidebarCollapsed ? 'mt-4 mb-4' : 'mb-4'}`}>
+        <div className={`px-4 ${effectiveSidebarCollapsed ? 'mt-4 mb-4' : 'mb-4'}`}>
           <button 
             onClick={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
-            className={`w-full py-2 bg-slate-50/50 hover:bg-slate-100/80 dark:bg-slate-800/40 dark:hover:bg-slate-800/80 border border-slate-100 dark:border-slate-800/50 text-slate-450 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all flex items-center cursor-pointer group ${isSidebarCollapsed ? 'px-2 justify-center' : 'px-3 justify-between text-left'}`}
+            className={`w-full py-2 bg-slate-50/50 hover:bg-slate-100/80 dark:bg-slate-800/40 dark:hover:bg-slate-800/80 border border-slate-100 dark:border-slate-800/50 text-slate-450 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all flex items-center cursor-pointer group ${effectiveSidebarCollapsed ? 'px-2 justify-center' : 'px-3 justify-between text-left'}`}
           >
             <div className="flex items-center gap-2">
               <Search className="w-4 h-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
-              {!isSidebarCollapsed && <span className="text-[10.5px] font-medium whitespace-nowrap">Buscador</span>}
+              {!effectiveSidebarCollapsed && <span className="text-[10.5px] font-medium whitespace-nowrap">Buscador</span>}
             </div>
-            {!isSidebarCollapsed && (
+            {!effectiveSidebarCollapsed && (
               <kbd className="text-[8.5px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-500 rounded px-1 py-0.5 tracking-tight font-mono font-bold shrink-0">
                 Ctrl+K
               </kbd>
@@ -1590,9 +1812,14 @@ export default function App() {
             return (
               <button
                 key={item.id}
-                title={isSidebarCollapsed ? item.label : undefined}
-                onClick={() => setActiveTab(item.id as ActiveTab)}
-                className={`w-full text-left font-bold text-xs py-3 rounded-xl transition-all cursor-pointer inline-flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'} ${
+                title={effectiveSidebarCollapsed ? item.label : undefined}
+                onClick={() => {
+                  if (item.id === "pacientes") {
+                    setActivePatientId("");
+                  }
+                  setActiveTab(item.id as ActiveTab);
+                }}
+                className={`w-full text-left font-bold text-xs py-3 rounded-xl transition-all cursor-pointer inline-flex items-center gap-3 ${effectiveSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'} ${
                   isActive
                     ? isNeon
                       ? "bg-gradient-to-r from-teal-600 via-teal-500 to-indigo-650 text-white shadow-[0_0_16px_rgba(20,184,166,0.55)] scale-[1.03]"
@@ -1611,30 +1838,30 @@ export default function App() {
                   )}
                   <ActiveIcon className={`w-4 h-4 relative z-10 ${isNeon ? (isActive ? 'text-white scale-110' : 'text-slate-700 dark:text-slate-200') : ''}`} />
                 </div>
-                {!isSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                {!effectiveSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
               </button>
             );
           })}
 
           <button
             onClick={handleLogout}
-            title={isSidebarCollapsed ? "Cerrar sesión" : undefined}
-            className={`w-full text-left font-bold text-xs py-3 mt-2 rounded-xl transition-all cursor-pointer text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:bg-red-500/10 inline-flex items-center gap-3 ${isSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'}`}
+            title={effectiveSidebarCollapsed ? "Cerrar sesión" : undefined}
+            className={`w-full text-left font-bold text-xs py-3 mt-2 rounded-xl transition-all cursor-pointer text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:bg-red-500/10 inline-flex items-center gap-3 ${effectiveSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'}`}
           >
             <div className="relative flex items-center justify-center shrink-0">
               <LogOut className="w-4 h-4" />
             </div>
-            {!isSidebarCollapsed && <span className="whitespace-nowrap">Cerrar sesión</span>}
+            {!effectiveSidebarCollapsed && <span className="whitespace-nowrap">Cerrar sesión</span>}
           </button>
         </nav>
 
         {/* Footer info lock indicator */}
-        {!isSidebarCollapsed && (
+        {!effectiveSidebarCollapsed && (
           <div className="px-5 pt-4 border-t border-slate-50 dark:border-slate-800 text-[10px] text-slate-400 space-y-1 mt-auto overflow-hidden whitespace-nowrap transition-all duration-300">
             <p className="font-semibold">Licencia Profesional Activa</p>
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="font-mono">Encriptación SSL Local</span>
+              <span className="font-mono">Cifrado de Extremo a Extremo</span>
             </div>
           </div>
         )}
@@ -1708,7 +1935,12 @@ export default function App() {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id as ActiveTab)}
+              onClick={() => {
+                if (item.id === "pacientes") {
+                  setActivePatientId("");
+                }
+                setActiveTab(item.id as ActiveTab);
+              }}
               className={`flex flex-col items-center justify-center min-w-[50px] flex-1 gap-1 transition-all duration-200 shrink-0 ${
                 isActive 
                   ? isNeon 

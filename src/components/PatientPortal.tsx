@@ -218,7 +218,7 @@ export default function PatientPortal({
       </div>
 
       {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/50 px-6 py-4 shadow-sm">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/50 px-4 sm:px-6 py-3 sm:py-4 shadow-sm">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-teal-500/20">
@@ -252,10 +252,10 @@ export default function PatientPortal({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 lg:space-y-8 mt-4">
+      <main className="max-w-6xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 lg:space-y-8 mt-2 sm:mt-4">
         
         {/* Welcome Section */}
-        <div className="bg-white rounded-[2rem] border border-white shadow-xl shadow-slate-200/50 p-8 md:p-10 flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden group">
+        <div className="bg-white rounded-2xl sm:rounded-[2rem] border border-white shadow-xl shadow-slate-200/50 p-5 sm:p-8 md:p-10 flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden group">
           <div className="absolute right-0 top-0 w-64 h-64 bg-gradient-to-br from-teal-100/50 to-emerald-50/50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-700" />
           
           <div className="space-y-4 max-w-2xl text-center md:text-left relative z-10">
@@ -282,7 +282,7 @@ export default function PatientPortal({
           <div className="lg:col-span-8 space-y-6 lg:space-y-8">
             
             {/* BOOKING SECTION */}
-            <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
+            <div className="bg-white rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
               <div className="mb-6">
                 <h3 className="text-xl font-display font-black text-slate-800 flex items-center gap-3">
                   <Calendar className="w-6 h-6 text-teal-500 bg-teal-50 p-1 rounded-lg" />
@@ -386,7 +386,7 @@ export default function PatientPortal({
             </div>
 
             {/* UPCOMING APPOINTMENTS */}
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-3xl p-6 lg:p-8 border border-teal-100">
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-3xl p-4 sm:p-6 lg:p-8 border border-teal-100">
               <h3 className="text-xl font-display font-black text-slate-800 mb-6 flex items-center gap-3">
                 <Clock className="w-6 h-6 text-teal-600" />
                 Mis Próximas Horas

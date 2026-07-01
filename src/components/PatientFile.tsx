@@ -287,10 +287,10 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
       className="w-full text-slate-800 dark:text-slate-200"
     >
       {/* Tabs */}
-      <div className="flex border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl px-6 pt-2">
+      <div className="flex border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl px-4 sm:px-6 pt-2 overflow-x-auto hide-scrollbar whitespace-nowrap">
         <button
           onClick={() => setActiveTab('anamnesis')}
-          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 flex-shrink-0 ${
             activeTab === 'anamnesis' 
               ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
@@ -301,7 +301,7 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
         </button>
         <button
           onClick={() => setActiveTab('evoluciones')}
-          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 flex-shrink-0 ${
             activeTab === 'evoluciones' 
               ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
@@ -312,7 +312,7 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
         </button>
         <button
           onClick={() => setActiveTab('consentimientos')}
-          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 flex-shrink-0 ${
             activeTab === 'consentimientos' 
               ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
@@ -332,8 +332,44 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-6 max-w-4xl"
+              className="grid grid-cols-1 lg:grid-cols-4 gap-6 w-full max-w-7xl mx-auto"
             >
+              {/* Sidebar Navigation */}
+              <div className="lg:col-span-1 flex flex-col gap-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 h-fit sticky top-4 shadow-sm">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-2 mb-2 block font-mono">
+                  Secciones de Anamnesis
+                </span>
+                {[
+                  { id: 'motivo', label: 'Motivo de Consulta', icon: FileText, desc: 'Dolor y motivo principal' },
+                  { id: 'sistemico', label: 'Historial Sistémico', icon: HeartPulse, desc: 'Alergias, diabetes, HTA' },
+                  { id: 'especializacion', label: 'Cuestionario Clínico', icon: ShieldAlert, desc: 'Especialidades dentales' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = expandedSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setExpandedSection(item.id)}
+                      className={`w-full text-left p-3 rounded-xl transition-all flex items-center gap-3 border cursor-pointer ${
+                        isActive
+                          ? 'bg-teal-500/10 border-teal-500/20 text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 font-black'
+                          : 'bg-transparent border-transparent text-slate-500 hover:text-slate-850 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg ${isActive ? 'bg-teal-500 text-white shadow-sm' : 'bg-slate-150 dark:bg-slate-850 text-slate-500'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold truncate">{item.label}</span>
+                        <span className="text-[9px] text-slate-450 dark:text-slate-500 truncate">{item.desc}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Content Panels Area */}
+              <div className="lg:col-span-3 space-y-6">
               {/* SECCION 1: MOTIVO DE CONSULTA Y DOLOR */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <ToggleHeader id="motivo" icon={FileText} title="Motivo de Consulta" description="Razón principal de la visita y evaluación del dolor actual" expandedSection={expandedSection} setExpandedSection={setExpandedSection} />
@@ -1488,6 +1524,7 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
                 </div>
               </div>
 
+              </div>
             </motion.div>
           )}
 

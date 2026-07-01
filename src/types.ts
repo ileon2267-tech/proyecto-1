@@ -67,6 +67,9 @@ export interface TreatmentProcedure {
   description: string;
   cost: number;
   completed: boolean;
+  tooth?: string; // e.g. "1.4" or "Arcada Superior"
+  surface?: string; // e.g. "Mesial", "Vestibular", "Todas"
+  discount?: number; // percentage
 }
 
 export interface TreatmentPlan {

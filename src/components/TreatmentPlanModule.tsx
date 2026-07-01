@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Patient, TreatmentProcedure, TreatmentPlan } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, Plus, Trash2, Calculator, CheckCircle2, DollarSign } from 'lucide-react';
+import { FileText, Plus, Trash2, Calculator, CheckCircle2, DollarSign, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface TreatmentPlanModuleProps {
   patient: Patient;
@@ -14,9 +14,27 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
   const [newDesc, setNewDesc] = useState('');
   const [newCost, setNewCost] = useState<number>(0);
   const [newPhase, setNewPhase] = useState<TreatmentProcedure['phase']>('Saneamiento');
+  const [newTooth, setNewTooth] = useState<string>('');
+  const [newSurface, setNewSurface] = useState<string>('');
+  const [newDiscount, setNewDiscount] = useState<number>(0);
 
   const tp = patient.treatmentPlan || { procedures: [], financing: { months: 1, downPayment: 0, interestRate: 0 } };
   const procedures = tp.procedures || [];
+
+  const getDentitoWarning = () => {
+    const warnings = [];
+    if (patient?.anamnesis?.hta) {
+      warnings.push("El paciente indicó hipertensión. Sugiero protocolo de anestesia sin vasoconstrictor y control de presión arterial pre-quirúrgico.");
+    }
+    if (patient?.anamnesis?.diabetes) {
+      warnings.push("El paciente es diabético. Monitorear hemoglobina glicosilada (HbA1c) previo a cirugías complejas y considerar profilaxis antibiótica.");
+    }
+    if (patient?.anamnesis?.alergias) {
+      warnings.push(`Alerta de alergias: ${patient.anamnesis.alergias}. Revisar indicaciones medicamentosas post-operatorias.`);
+    }
+    return warnings;
+  };
+  const dentitoWarnings = getDentitoWarning();
 
   const handleAddDefault = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -34,7 +52,10 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
       phase: newPhase,
       description: newDesc,
       cost: newCost,
-      completed: false
+      completed: false,
+      tooth: newTooth || undefined,
+      surface: newSurface || undefined,
+      discount: newDiscount || 0
     };
 
     const updatedPln: TreatmentPlan = {
@@ -45,6 +66,9 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
     onUpdatePatient({ ...patient, treatmentPlan: updatedPln });
     setNewDesc('');
     setNewCost(0);
+    setNewTooth('');
+    setNewSurface('');
+    setNewDiscount(0);
     setShowAddForm(false);
   };
 
@@ -58,8 +82,8 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
     onUpdatePatient({ ...patient, treatmentPlan: { ...tp, procedures: updated } });
   };
 
-  const totalCost = procedures.reduce((acc, p) => acc + p.cost, 0);
-  const totalCompleted = procedures.filter(p => p.completed).reduce((acc, p) => acc + p.cost, 0);
+  const totalCost = procedures.reduce((acc, p) => acc + Math.round(p.cost * (1 - ((p.discount || 0) / 100))), 0);
+  const totalCompleted = procedures.filter(p => p.completed).reduce((acc, p) => acc + Math.round(p.cost * (1 - ((p.discount || 0) / 100))), 0);
   const totalRemaining = totalCost - totalCompleted;
 
   return (
@@ -82,6 +106,31 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
         </button>
       </div>
 
+      {dentitoWarnings.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800/50 rounded-2xl p-4 shadow-sm flex items-start gap-3"
+        >
+          <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800/60 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
+              Dentito Copiloto
+              <span className="bg-indigo-200/50 dark:bg-indigo-800/80 text-indigo-700 dark:text-indigo-300 text-[9px] px-1.5 py-0.5 rounded-md uppercase font-black tracking-wider">Sugerencia Clínica</span>
+            </h4>
+            <ul className="mt-2 space-y-1">
+              {dentitoWarnings.map((warn, i) => (
+                <li key={i} className="text-xs text-indigo-800/80 dark:text-indigo-300/80 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-70" />
+                  <span>{warn}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </motion.div>
+      )}
+
       <AnimatePresence>
         {showAddForm && (
           <motion.div
@@ -93,8 +142,8 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-teal-900/30 shadow-sm space-y-4 mb-2">
               <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Nuevo Procedimiento Clínico</h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div className="space-y-1.5 md:col-span-3">
                   <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Arancel Predefinido:</label>
                   <select
                     onChange={handleAddDefault}
@@ -106,7 +155,7 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
                   </select>
                 </div>
 
-                <div className="space-y-1.5 md:col-span-1">
+                <div className="space-y-1.5 md:col-span-3">
                   <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fase:</label>
                   <select
                     value={newPhase}
@@ -120,19 +169,53 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
                   </select>
                 </div>
 
-                <div className="space-y-1.5 md:col-span-1">
-                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Descripción:</label>
+                <div className="space-y-1.5 md:col-span-6">
+                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Prestación (Descripción):</label>
                   <input
                     type="text"
                     value={newDesc}
                     onChange={(e) => setNewDesc(e.target.value)}
-                    placeholder="E.j. Endodoncia pieza 1.4"
+                    placeholder="E.j. Restauración Composite"
                     className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
                   />
                 </div>
 
-                <div className="space-y-1.5 md:col-span-1">
-                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Valor ($):</label>
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Pieza:</label>
+                  <input
+                    type="text"
+                    value={newTooth}
+                    onChange={(e) => setNewTooth(e.target.value)}
+                    placeholder="E.j. 1.4, Arcada Sup"
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Cara/Superficie:</label>
+                  <input
+                    type="text"
+                    value={newSurface}
+                    onChange={(e) => setNewSurface(e.target.value)}
+                    placeholder="E.j. Mesial, TODAS"
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Descuento (%):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={newDiscount}
+                    onChange={(e) => setNewDiscount(parseInt(e.target.value) || 0)}
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Valor Base ($):</label>
                   <input
                     type="number"
                     value={newCost}
@@ -142,12 +225,16 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-between items-center pt-2">
+                <div className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="text-xs uppercase text-slate-500 font-bold">Subtotal Estimado:</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400">${Math.round(newCost * (1 - (newDiscount / 100))).toLocaleString('es-CL')}</span>
+                </div>
                 <button
                   onClick={handleAddProcedure}
-                  className="bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 text-white font-bold py-2 px-5 rounded-lg text-xs transition-all shadow-sm"
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-6 rounded-lg text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer"
                 >
-                  Confirmar Acción
+                  <Plus className="w-3.5 h-3.5" /> Confirmar Prestación
                 </button>
               </div>
 
@@ -171,18 +258,25 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
                   <tr>
                     <th className="px-6 py-3">Estado</th>
                     <th className="px-6 py-3">Fase Tratamiento</th>
-                    <th className="px-6 py-3">Descripción</th>
-                    <th className="px-6 py-3 text-right">Costo ($)</th>
+                    <th className="px-6 py-3">Pieza</th>
+                    <th className="px-6 py-3">Cara</th>
+                    <th className="px-6 py-3">Prestación</th>
+                    <th className="px-6 py-3 text-right">Valor Base</th>
+                    <th className="px-6 py-3 text-right">Dto (%)</th>
+                    <th className="px-6 py-3 text-right">Subtotal ($)</th>
                     <th className="px-6 py-3 text-center">Gestión</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {procedures.map((proc) => (
+                  {procedures.map((proc) => {
+                    const discountValue = proc.discount || 0;
+                    const subtotal = Math.round(proc.cost * (1 - (discountValue / 100)));
+                    return (
                     <tr key={proc.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${proc.completed ? 'opacity-60' : ''}`}>
                       <td className="px-6 py-3 whitespace-nowrap">
                         <button 
                           onClick={() => handleToggleComplete(proc.id)}
-                          className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${proc.completed ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 dark:bg-slate-800 dark:text-slate-500'}`}
+                          className={`w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer ${proc.completed ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 dark:bg-slate-800 dark:text-slate-500'}`}
                         >
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
@@ -197,17 +291,30 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
                           {proc.phase}
                         </span>
                       </td>
+                      <td className="px-6 py-3 font-medium text-slate-800 dark:text-slate-200 text-xs">
+                        {proc.tooth ? <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 font-mono">{proc.tooth}</span> : <span className="text-slate-400">-</span>}
+                      </td>
+                      <td className="px-6 py-3 font-medium text-slate-800 dark:text-slate-200 text-xs">
+                        {proc.surface || <span className="text-slate-400">-</span>}
+                      </td>
                       <td className="px-6 py-3 font-medium text-slate-800 dark:text-slate-200">
                         <span className={proc.completed ? 'line-through decoration-slate-400 text-slate-400' : ''}>{proc.description}</span>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-right font-mono font-bold text-slate-700 dark:text-slate-300">
+                      <td className="px-6 py-3 whitespace-nowrap text-right font-mono text-slate-500 dark:text-slate-400 text-xs">
                         ${proc.cost.toLocaleString('es-CL')}
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap text-right font-mono text-rose-500 text-xs font-bold">
+                        {discountValue > 0 ? `-${discountValue}%` : '-'}
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap text-right font-mono font-bold text-slate-800 dark:text-slate-100">
+                        ${subtotal.toLocaleString('es-CL')}
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap text-center text-red-500 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" onClick={() => handleDelete(proc.id)}>
                         <Trash2 className="w-4 h-4 mx-auto" />
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

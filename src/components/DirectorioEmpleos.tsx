@@ -137,7 +137,7 @@ export default function DirectorioEmpleos() {
       </div>
 
       {/* HORIZONTAL FILTERS */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
         {[
           { label: "Todos", value: "All" },
           { label: "Periodoncia", value: "Periodoncia" },

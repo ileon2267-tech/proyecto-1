@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PeriodonState, ToothState, Patient } from "../types";
 import { UPPER_TEETH, LOWER_TEETH, ALL_TEETH_NUMBERS } from "../initialData";
+import InteractiveTooth3D from "./InteractiveTooth3D";
 import { 
   Droplet, 
   CircleDot, 
@@ -14,9 +15,102 @@ import {
   Sparkles,
   Zap,
   Award,
-  Settings
+  Settings,
+  Mic,
+  MicOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
+  const lastDigit = num % 10;
+  let family: "molar" | "premolar" | "canine" | "incisor" = "incisor";
+  if (lastDigit === 1 || lastDigit === 2) family = "incisor";
+  else if (lastDigit === 3) family = "canine";
+  else if (lastDigit === 4 || lastDigit === 5) family = "premolar";
+  else family = "molar";
+
+  if (arch === "upper") {
+    switch (family) {
+      case "molar":
+        return {
+          rootPath: "M 32,80 C 12,42 22,22 28,12 C 34,26 36,46 42,80 C 44,46 47,24 49,8 C 51,24 54,46 56,80 C 58,46 60,26 66,12 C 72,22 82,42 68,80 Z",
+          crownPath: "M 32,80 C 21,95 24,125 35,131 Q 50,135 65,131 C 76,125 79,95 68,80 Z",
+          dentinPath: "M 35,80 C 23,48 31,30 35,20 C 39,32 40,50 44,80 C 46,50 48,32 50,16 C 52,32 54,50 56,80 C 58,50 59,32 63,20 C 67,30 75,48 65,80 Z",
+          pulpPath: "M 44,80 C 42,50 43,36 43,24 C 44,36 45,55 48,80 C 49,55 50,36 51,24 C 50,36 51,50 49,80 Z",
+          highlightPath: "M 38,84 C 32,94 34,118 43,123",
+          ligamentPath: "M 29,80 C 9,38 19,18 26,8 C 32,24 34,44 41,80 C 43,44 46,22 49,4 C 52,22 55,44 57,80 C 59,44 61,24 67,8 C 74,18 84,38 71,80"
+        };
+      case "premolar":
+        return {
+          rootPath: "M 34,80 C 20,40 33,24 36,12 C 39,26 42,46 47,80 C 50,46 53,26 56,12 C 59,24 72,40 64,80 Z",
+          crownPath: "M 34,80 C 24,94 28,124 44,128 Q 50,130 56,128 C 72,124 76,94 64,80 Z",
+          dentinPath: "M 37,80 C 27,45 36,32 39,20 C 41,32 43,48 48,80 C 50,48 52,32 54,20 C 57,32 66,45 61,80 Z",
+          pulpPath: "M 45,80 C 43,50 44,36 44,22 C 45,36 47,55 49,80 C 50,55 52,36 52,22 C 51,36 52,50 50,80 Z",
+          highlightPath: "M 39,84 C 33,94 35,118 44,122",
+          ligamentPath: "M 31,80 C 17,36 30,20 34,8 C 37,22 40,42 46,80 C 49,42 52,22 55,8 C 58,20 71,36 67,80"
+        };
+      case "canine":
+        return {
+          rootPath: "M 35,80 C 23,40 37,16 46,2 C 48,16 62,40 65,80 Z",
+          crownPath: "M 35,80 C 25,95 28,120 50,134 C 72,120 75,95 65,80 Z",
+          dentinPath: "M 38,80 C 29,45 40,24 47,10 C 49,24 60,45 62,80 Z",
+          pulpPath: "M 46,80 C 43,50 45,32 47,18 C 49,32 51,50 49,80 Z",
+          highlightPath: "M 39,84 C 33,94 35,116 44,122",
+          ligamentPath: "M 32,80 C 20,36 34,12 45,0 C 47,12 61,36 68,80"
+        };
+      case "incisor":
+      default:
+        return {
+          rootPath: "M 36,80 C 28,45 40,25 47,8 C 49,25 61,45 64,80 Z",
+          crownPath: "M 36,80 C 28,94 30,124 38,128 L 62,128 C 70,124 72,94 64,80 Z",
+          dentinPath: "M 39,80 C 33,50 42,32 48,16 C 50,32 59,50 61,80 Z",
+          pulpPath: "M 46,80 C 44,52 46,36 48,22 C 50,36 52,52 50,80 Z",
+          highlightPath: "M 40,84 C 34,94 35,118 41,122",
+          ligamentPath: "M 33,80 C 25,41 37,21 46,4 C 48,21 60,41 67,80"
+        };
+    }
+  } else {
+    switch (family) {
+      case "molar":
+        return {
+          rootPath: "M 32,80 C 12,118 22,138 28,148 C 34,134 36,114 42,80 C 44,114 47,136 49,152 C 51,136 54,114 56,80 C 58,114 60,134 66,148 C 72,138 82,118 68,80 Z",
+          crownPath: "M 32,80 C 21,65 24,35 35,29 Q 50,25 65,29 C 76,35 79,65 68,80 Z",
+          dentinPath: "M 35,80 C 23,112 31,130 35,140 C 39,128 40,110 44,80 C 46,110 48,128 50,144 C 52,128 54,110 56,80 C 58,110 59,128 63,140 C 67,130 75,112 65,80 Z",
+          pulpPath: "M 44,80 C 42,110 43,124 43,136 C 44,124 45,105 48,80 C 49,105 50,124 51,136 C 50,124 51,110 49,80 Z",
+          highlightPath: "M 38,76 C 32,66 34,42 43,37",
+          ligamentPath: "M 29,80 C 9,122 19,142 26,152 C 32,136 34,116 41,80 C 43,116 46,138 49,156 C 52,138 55,116 57,80 C 59,116 61,136 67,152 C 74,142 84,122 71,80"
+        };
+      case "premolar":
+        return {
+          rootPath: "M 34,80 C 20,120 33,136 36,148 C 39,134 42,114 47,80 C 50,114 53,134 56,148 C 59,136 72,120 64,80 Z",
+          crownPath: "M 34,80 C 24,66 28,36 44,32 Q 50,30 56,32 C 72,36 76,66 64,80 Z",
+          dentinPath: "M 37,80 C 27,115 36,128 39,140 C 41,128 43,112 48,80 C 50,112 52,128 54,140 C 57,128 66,115 61,80 Z",
+          pulpPath: "M 45,80 C 43,110 44,124 44,138 C 45,124 47,105 49,80 C 50,105 52,124 52,138 C 51,124 52,110 50,80 Z",
+          highlightPath: "M 39,76 C 33,66 35,42 44,38",
+          ligamentPath: "M 31,80 C 17,124 30,140 34,152 C 37,138 40,118 46,80 C 49,118 52,138 55,152 C 58,140 71,124 67,80"
+        };
+      case "canine":
+        return {
+          rootPath: "M 35,80 C 23,120 37,144 46,158 C 48,144 62,120 65,80 Z",
+          crownPath: "M 35,80 C 25,65 28,40 50,26 C 72,40 75,65 65,80 Z",
+          dentinPath: "M 38,80 C 29,115 40,136 47,150 C 49,136 60,115 62,80 Z",
+          pulpPath: "M 46,80 C 43,110 45,128 47,142 C 49,128 51,110 49,80 Z",
+          highlightPath: "M 39,76 C 33,66 35,44 44,38",
+          ligamentPath: "M 32,80 C 20,124 34,148 45,160 C 47,148 61,124 68,80"
+        };
+      case "incisor":
+      default:
+        return {
+          rootPath: "M 36,80 C 28,115 40,135 47,152 C 49,135 61,115 64,80 Z",
+          crownPath: "M 36,80 C 28,66 30,36 38,32 L 62,32 C 70,36 72,66 64,80 Z",
+          dentinPath: "M 39,80 C 33,110 42,128 48,144 C 50,128 59,110 61,80 Z",
+          pulpPath: "M 46,80 C 44,108 46,124 48,138 C 50,124 52,108 50,80 Z",
+          highlightPath: "M 40,76 C 34,66 35,42 41,38",
+          ligamentPath: "M 33,80 C 25,119 37,139 46,156 C 48,139 60,119 67,80"
+        };
+    }
+  }
+};
 
 interface PeriodontogramaProps {
   periodontogram: Record<number, PeriodonState>;
@@ -30,11 +124,167 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
   const [selectedTooth, setSelectedTooth] = useState<number>(16);
   const [activeArch, setActiveArch] = useState<"upper" | "lower">("upper");
 
+  const teethList = activeArch === "upper" 
+    ? [...UPPER_TEETH.right, ...UPPER_TEETH.left]
+    : [...LOWER_TEETH.right, ...LOWER_TEETH.left];
+
+  // 3D Tooth & Bone Support interactive states
+
   // Keyboard shortcut assistant
   const [keyboardMode, setKeyboardMode] = useState<boolean>(false);
   const [inputMetric, setInputMetric] = useState<"pocket" | "recess">("pocket");
   const [inputSurface, setInputSurface] = useState<"vestibular" | "palatino">("vestibular");
   const [inputPosition, setInputPosition] = useState<"mesial" | "central" | "distal">("mesial");
+
+  // Voice assistant clinical mode states
+  const [voiceChartingMode, setVoiceChartingMode] = useState<boolean>(false);
+  const [voiceTranscript, setVoiceTranscript] = useState<string>("");
+  const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
+
+  const voiceStateRef = React.useRef({
+    selectedTooth,
+    inputMetric,
+    inputSurface,
+    inputPosition,
+    periodontogram,
+    teethList,
+  });
+
+  useEffect(() => {
+    voiceStateRef.current = {
+      selectedTooth,
+      inputMetric,
+      inputSurface,
+      inputPosition,
+      periodontogram,
+      teethList,
+    };
+  }, [selectedTooth, inputMetric, inputSurface, inputPosition, periodontogram, teethList]);
+
+  useEffect(() => {
+    if (voiceChartingMode) {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert("Tu navegador no soporta reconocimiento de voz nativo.");
+        setVoiceChartingMode(false);
+        return;
+      }
+      const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognitionConstructor();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'es-CL';
+
+      recognition.onresult = (event: any) => {
+        const current = event.resultIndex;
+        const transcript = event.results[current][0].transcript.toLowerCase();
+        setVoiceTranscript(transcript);
+        
+        // Simple NLP parser for: "pieza [num] vestibular bolsa [num] [num] [num]"
+        const words = transcript.split(/\s+/);
+        
+        let newNum = voiceStateRef.current.selectedTooth;
+        let surface = voiceStateRef.current.inputSurface;
+        let metric = voiceStateRef.current.inputMetric;
+
+        // Parse tooth
+        const piezaIdx = words.indexOf('pieza');
+        if (piezaIdx !== -1 && words[piezaIdx + 1]) {
+          const parsedNum = parseInt(words[piezaIdx + 1]);
+          if (!isNaN(parsedNum) && voiceStateRef.current.teethList.includes(parsedNum)) {
+            newNum = parsedNum;
+            setSelectedTooth(newNum);
+          }
+        } else {
+          // just numbers fallback
+          const possibleNums = words.map((w: string) => parseInt(w)).filter((n: number) => !isNaN(n) && voiceStateRef.current.teethList.includes(n));
+          if (possibleNums.length > 0) {
+             newNum = possibleNums[0];
+             setSelectedTooth(newNum);
+          }
+        }
+
+        // Parse surface
+        if (transcript.includes('vestibular')) {
+           surface = "vestibular";
+           setInputSurface("vestibular");
+        } else if (transcript.includes('palatino') || transcript.includes('lingual')) {
+           surface = "palatino";
+           setInputSurface("palatino");
+        }
+
+        // Parse metric
+        if (transcript.includes('bolsa') || transcript.includes('sondaje')) {
+          metric = "pocket";
+          setInputMetric("pocket");
+        } else if (transcript.includes('recesión') || transcript.includes('margen')) {
+          metric = "recess";
+          setInputMetric("recess");
+        }
+
+        // Extract values (looking for sequence of 3 digits e.g. "4 5 4" or "2 1 2")
+        const numberMatches = transcript.match(/\b\d\b/g); // Find single digits
+        if (numberMatches && numberMatches.length >= 3) {
+          // get the last 3 digits spoken
+          const last3 = numberMatches.slice(-3).map(Number);
+          
+          const currentToothData: PeriodonState = voiceStateRef.current.periodontogram[newNum] || {
+            toothNumber: newNum,
+            vestibularPocket: { mesial: 2, central: 1, distal: 2 },
+            palatinoPocket: { mesial: 2, central: 1, distal: 2 },
+            vestibularRecess: { mesial: 0, central: 0, distal: 0 },
+            palatinoRecess: { mesial: 0, central: 0, distal: 0 },
+            sangradoVestibular: { mesial: false, central: false, distal: false },
+            sangradoPalatino: { mesial: false, central: false, distal: false },
+            supuracionVestibular: { mesial: false, central: false, distal: false },
+            supuracionPalatino: { mesial: false, central: false, distal: false },
+            placaVestibular: { mesial: false, central: false, distal: false },
+            placaPalatino: { mesial: false, central: false, distal: false },
+            movilidad: 0,
+            furca: 0
+          };
+
+          const key = surface === "vestibular" 
+            ? (metric === "pocket" ? "vestibularPocket" : "vestibularRecess")
+            : (metric === "pocket" ? "palatinoPocket" : "palatinoRecess");
+
+          const updated = {
+            ...voiceStateRef.current.periodontogram,
+            [newNum]: {
+              ...currentToothData,
+              [key]: {
+                mesial: last3[0],
+                central: last3[1],
+                distal: last3[2]
+              }
+            }
+          };
+
+          onChange(updated);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Voice Recognition Error:", event.error);
+        if (event.error !== 'no-speech') {
+          setVoiceChartingMode(false);
+        }
+      };
+
+      recognition.start();
+      setRecognitionInstance(recognition);
+    } else {
+      if (recognitionInstance) {
+        recognitionInstance.stop();
+        setRecognitionInstance(null);
+      }
+    }
+
+    return () => {
+      if (recognitionInstance) {
+        recognitionInstance.stop();
+      }
+    };
+  }, [voiceChartingMode]);
 
   // Prognosis and Lang & Tonetti Risk parameters (synced back to patient or internal state fallbacks)
   const [internalSmoking, setInternalSmoking] = useState<number>(0);
@@ -103,9 +353,7 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
     }
   };
 
-  const teethList = activeArch === "upper" 
-    ? [...UPPER_TEETH.right, ...UPPER_TEETH.left]
-    : [...LOWER_TEETH.right, ...LOWER_TEETH.left];
+  // teethList moved to top of component to support voice hooks
 
   const isUpper = UPPER_TEETH.right.includes(selectedTooth) || UPPER_TEETH.left.includes(selectedTooth);
 
@@ -319,6 +567,184 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
     };
   }, [keyboardMode, selectedTooth, inputMetric, inputSurface, inputPosition, periodontogram, teethList]);
 
+  // Voice command parsing logic for hands-free clinical input
+  const parseVoiceCommand = (rawText: string) => {
+    const text = rawText.toLowerCase().trim();
+    setVoiceTranscript(rawText);
+
+    const {
+      selectedTooth: refSelected,
+      inputMetric: refMetric,
+      inputSurface: refSurface,
+      inputPosition: refPosition,
+      teethList: refList,
+    } = voiceStateRef.current;
+
+    // 1. Navigation & State changes first
+    if (text.includes("siguiente") || text.includes("avanzar")) {
+      const idx = refList.indexOf(refSelected);
+      const nextIdx = (idx + 1) % refList.length;
+      setSelectedTooth(refList[nextIdx]);
+      return;
+    }
+    if (text.includes("atrás") || text.includes("anterior") || text.includes("regresar") || text.includes("atras")) {
+      const idx = refList.indexOf(refSelected);
+      const prevIdx = idx > 0 ? idx - 1 : refList.length - 1;
+      setSelectedTooth(refList[prevIdx]);
+      return;
+    }
+    if (text.includes("vestibular") || text.includes("exterior") || text.includes("afuera")) {
+      setInputSurface("vestibular");
+      return;
+    }
+    if (text.includes("palatino") || text.includes("lingual") || text.includes("interior") || text.includes("adentro")) {
+      setInputSurface("palatino");
+      return;
+    }
+    if (text.includes("mesial")) {
+      setInputPosition("mesial");
+      return;
+    }
+    if (text.includes("central") || text.includes("medio")) {
+      setInputPosition("central");
+      return;
+    }
+    if (text.includes("distal")) {
+      setInputPosition("distal");
+      return;
+    }
+    if (text.includes("sondaje") || text.includes("profundidad") || text.includes("bolsa")) {
+      setInputMetric("pocket");
+      return;
+    }
+    if (text.includes("recesión") || text.includes("recesion") || text.includes("receso")) {
+      setInputMetric("recess");
+      return;
+    }
+
+    // 2. Flags toggles
+    if (text.includes("sangrado") || text.includes("sangra") || text.includes("bop") || text.includes("sangrar")) {
+      const flagSurface = refSurface === "vestibular" ? "sangradoVestibular" : "sangradoPalatino";
+      handleToggleFlag(refSelected, flagSurface, refPosition);
+      return;
+    }
+    if (text.includes("placa") || text.includes("bacterias") || text.includes("sarro")) {
+      const flagSurface = refSurface === "vestibular" ? "placaVestibular" : "placaPalatino";
+      handleToggleFlag(refSelected, flagSurface, refPosition);
+      return;
+    }
+    if (text.includes("supuración") || text.includes("supuracion") || text.includes("pus") || text.includes("supura")) {
+      const flagSurface = refSurface === "vestibular" ? "supuracionVestibular" : "supuracionPalatino";
+      handleToggleSupuracion(refSelected, flagSurface, refPosition);
+      return;
+    }
+
+    // 3. Number Parsing for pocket/recess values
+    let val: number | null = null;
+    if (text.includes("cero") || text === "0" || text.includes("nulo")) val = 0;
+    else if (text.includes("uno") || text.includes("una") || text === "1") val = 1;
+    else if (text.includes("dos") || text === "2") val = 2;
+    else if (text.includes("tres") || text.includes("tre") || text === "3") val = 3;
+    else if (text.includes("cuatro") || text === "4") val = 4;
+    else if (text.includes("cinco") || text === "5") val = 5;
+    else if (text.includes("seis") || text === "6") val = 6;
+    else if (text.includes("siete") || text === "7") val = 7;
+    else if (text.includes("ocho") || text === "8") val = 8;
+    else if (text.includes("nueve") || text === "9") val = 9;
+    else if (text.includes("diez") || text === "10") val = 10;
+    else if (text.includes("once") || text === "11") val = 11;
+    else if (text.includes("doce") || text === "12") val = 12;
+    else if (text.includes("trece") || text === "13") val = 13;
+    else if (text.includes("catorce") || text === "14") val = 14;
+    else if (text.includes("quince") || text === "15") val = 15;
+
+    // If a number was successfully found, set it and advance site
+    if (val !== null) {
+      const targetField = refSurface === "vestibular"
+        ? (refMetric === "pocket" ? "vestibularPocket" : "vestibularRecess")
+        : (refMetric === "pocket" ? "palatinoPocket" : "palatinoRecess");
+
+      handlePocketChange(refSelected, targetField, refPosition, val);
+
+      // Replicate fast advance sequence: mesial -> central -> distal
+      if (refPosition === "mesial") {
+        setInputPosition("central");
+      } else if (refPosition === "central") {
+        setInputPosition("distal");
+      } else {
+        // distal completed, now toggle face or advance tooth
+        if (refSurface === "vestibular") {
+          setInputSurface("palatino");
+          setInputPosition("mesial");
+        } else {
+          // Both vestibular and palatine faces completed, move to next tooth clinical sequence
+          const idx = refList.indexOf(refSelected);
+          const nextIdx = (idx + 1) % refList.length;
+          setSelectedTooth(refList[nextIdx]);
+          setInputSurface("vestibular");
+          setInputPosition("mesial");
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!voiceChartingMode) {
+      if (recognitionInstance) {
+        try {
+          recognitionInstance.stop();
+        } catch (e) {}
+      }
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("La API de reconocimiento de voz no está soportada en este navegador. Por favor usa Google Chrome.");
+      setVoiceChartingMode(false);
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.lang = "es-ES";
+    rec.interimResults = false;
+    rec.continuous = true;
+
+    rec.onresult = (event: any) => {
+      const lastResultIndex = event.results.length - 1;
+      const transcript = event.results[lastResultIndex][0].transcript;
+      parseVoiceCommand(transcript);
+    };
+
+    rec.onerror = (e: any) => {
+      console.error("Speech recognition error", e);
+    };
+
+    rec.onend = () => {
+      // Auto restart to remain fully active
+      if (voiceStateRef.current.selectedTooth) { // standard check
+        try {
+          rec.start();
+        } catch (err) {}
+      }
+    };
+
+    try {
+      rec.start();
+      setRecognitionInstance(rec);
+    } catch (err) {
+      console.error("Error starting SpeechRecognition", err);
+    }
+
+    return () => {
+      if (rec) {
+        try {
+          rec.stop();
+        } catch (e) {}
+      }
+    };
+  }, [voiceChartingMode]);
+
   const handlePocketChange = (
     toothNum: number,
     surface: "vestibularPocket" | "palatinoPocket" | "vestibularRecess" | "palatinoRecess",
@@ -416,9 +842,36 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
     return { bleeding, plaque, maxPocket: maxPk, hasSuppuration: hasSupp };
   };
 
+  const getToothMetrics = (num: number) => {
+    const data = periodontogram[num];
+    const pocket = inputSurface === "vestibular" 
+      ? (data?.vestibularPocket || { mesial: 2, central: 1, distal: 2 })
+      : (data?.palatinoPocket || { mesial: 2, central: 1, distal: 2 });
+    const recess = inputSurface === "vestibular"
+      ? (data?.vestibularRecess || { mesial: 0, central: 0, distal: 0 })
+      : (data?.palatinoRecess || { mesial: 0, central: 0, distal: 0 });
+    
+    // Check if right or left side to orient the mesial-distal points correctly from left to right on screen
+    const isRightSide = (num >= 11 && num <= 18) || (num >= 41 && num <= 48);
+    if (isRightSide) {
+      return {
+        left: { pocket: pocket.distal ?? 2, recess: recess.distal ?? 0, label: "Distal" },
+        central: { pocket: pocket.central ?? 1, recess: recess.central ?? 0, label: "Central" },
+        right: { pocket: pocket.mesial ?? 2, recess: recess.mesial ?? 0, label: "Mesial" },
+      };
+    } else {
+      return {
+        left: { pocket: pocket.mesial ?? 2, recess: recess.mesial ?? 0, label: "Mesial" },
+        central: { pocket: pocket.central ?? 1, recess: recess.central ?? 0, label: "Central" },
+        right: { pocket: pocket.distal ?? 2, recess: recess.distal ?? 0, label: "Distal" },
+      };
+    }
+  };
+
   const activeToothData = periodontogram[selectedTooth];
   const toothIsImplant = odontogram?.[selectedTooth]?.condition === "implante";
   const toothIsMissing = odontogram?.[selectedTooth]?.condition === "ausente";
+  const paths = getToothAnatomyPaths(selectedTooth, activeArch);
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm p-6 space-y-6" id="periodonto-panel">
@@ -661,8 +1114,8 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                     <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-700 font-sans">S / B</span> Toggle Sangrado</div>
                     <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-700 font-sans font-semibold">P / L</span> Toggle Placa (Bact)</div>
                     <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-700 font-sans">U / D</span> Toggle Supuración</div>
-                    <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-705 font-sans">&larr; / &rarr;</span> Siguiente Diente</div>
-                    <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-705 font-sans">&uarr; / &darr;</span> Alternar Medición</div>
+                    <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-750 font-sans">&larr; / &rarr;</span> Siguiente Diente</div>
+                    <div><span className="text-teal-600 font-bold bg-white dark:bg-slate-800 px-1 rounded dark:border dark:border-slate-750 font-sans">&uarr; / &darr;</span> Alternar Medición</div>
                   </div>
                   <div className="pt-2 border-t border-teal-500/10 flex flex-wrap gap-2 text-[10px]">
                     <span className="text-slate-400 font-sans">Celda Activa:</span>
@@ -673,419 +1126,548 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                 </motion.div>
               )}
 
-              {/* LIVE SVG ANATOMICAL CROSS SECTION GRAPH */}
-              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800/85">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">
-                  Esquema Anatómico Interactivo de Raíz y Corona
-                </span>
+              {/* Dictado por Voz Clínico (Modo Manos Libres) */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Mic className={`w-4 h-4 ${voiceChartingMode ? "text-red-500" : "text-emerald-500"}`} />
+                      {voiceChartingMode && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Asistente de Dictado por Voz Clínico (Manos Libres)
+                    </span>
+                    <span className="text-[8px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">PRO v15</span>
+                  </div>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-400 leading-snug">
+                    Usa comandos de voz en español para rellenar el periodontograma completo sin tocar el teclado.
+                  </p>
+                </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  {/* The actual SVG tooth representation */}
-                  <div className="w-full max-w-[200px] h-[220px] bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800/40 relative flex items-center justify-center">
-                    <svg viewBox="0 0 100 160" className="w-full h-full select-none">
-                      {/* Definitions */}
+                <div className="flex items-center gap-3.5">
+                  <button
+                    onClick={() => {
+                      setVoiceChartingMode(!voiceChartingMode);
+                      if (!voiceChartingMode) {
+                        setKeyboardMode(true); // Auto-enable keyboard metrics logic for coordination
+                      }
+                    }}
+                    className={`text-xs font-bold py-1.5 px-4 rounded-full border cursor-pointer transition-all flex items-center gap-1.5 ${
+                      voiceChartingMode 
+                        ? "bg-red-500/15 text-red-650 dark:text-red-400 border-red-500/30 shadow-md shadow-red-950/15" 
+                        : "bg-slate-50 text-slate-500 hover:text-emerald-500 hover:bg-emerald-50 dark:bg-slate-850 dark:text-slate-400 border-slate-200"
+                    }`}
+                  >
+                    {voiceChartingMode ? (
+                      <>
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
+                        <span>Escuchando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500" />
+                        <span>Activar Voz</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Voice Guide Panel and Live Transcript */}
+              {voiceChartingMode && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="bg-emerald-950/20 dark:bg-emerald-950/10 border border-emerald-500/20 p-3.5 rounded-lg space-y-3.5 text-[10.5px] leading-relaxed animate-in fade-in duration-200"
+                >
+                  <div className="flex justify-between items-center border-b border-emerald-500/10 pb-2">
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500" /> Guía de Comandos de Voz Clínicos
+                    </p>
+                    <div className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-mono font-bold animate-pulse">
+                      Estado: Escuchando activamente
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-slate-650 dark:text-slate-350 font-sans">
+                    <div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">"cero" a "quince"</span>
+                      <p className="text-[9.5px] text-slate-450 dark:text-slate-450 leading-none mt-0.5">Ingresa los milímetros del sondaje/recesión y avanza al siguiente sitio automáticamente.</p>
+                    </div>
+                    <div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">"sangrado" / "bop"</span>
+                      <p className="text-[9.5px] text-slate-450 dark:text-slate-450 leading-none mt-0.5">Activa/Desactiva el sangrado al sondaje en el sitio actual.</p>
+                    </div>
+                    <div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">"placa" / "bacterias"</span>
+                      <p className="text-[9.5px] text-slate-450 dark:text-slate-450 leading-none mt-0.5">Activa/Desactiva la placa bacteriana en el sitio actual.</p>
+                    </div>
+                    <div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">"supuración" / "pus"</span>
+                      <p className="text-[9.5px] text-slate-450 dark:text-slate-450 leading-none mt-0.5">Activa/Desactiva la presencia de supuración purulenta.</p>
+                    </div>
+                    <div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">"siguiente" / "atrás"</span>
+                      <p className="text-[9.5px] text-slate-450 dark:text-slate-450 leading-none mt-0.5">Navega libremente entre las piezas dentales permanentemente.</p>
+                    </div>
+                    <div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">"vestibular" / "palatino"</span>
+                      <p className="text-[9.5px] text-slate-450 dark:text-slate-450 leading-none mt-0.5">Cambia la cara activa entre externa (vestibular) e interna (palatina/lingual).</p>
+                    </div>
+                  </div>
+
+                  {voiceTranscript && (
+                    <div className="pt-2.5 border-t border-emerald-500/10 flex items-center justify-between gap-2 bg-black/10 px-2.5 py-1.5 rounded-md">
+                      <span className="text-[9.5px] text-slate-450 dark:text-slate-400 font-bold font-mono uppercase tracking-wide">Último dictado capturado:</span>
+                      <span className="bg-emerald-500 text-white font-black px-2 py-0.5 rounded font-mono text-[10px] shadow-sm tracking-wide">
+                        "{voiceTranscript}"
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-emerald-500/10 flex flex-wrap gap-2 text-[10px]">
+                    <span className="text-slate-400 font-sans">Celda Seleccionada por Voz:</span>
+                    <span className="bg-slate-800 text-white dark:bg-slate-900 border border-slate-700 px-2 py-0.5 rounded font-bold uppercase font-mono">
+                      Pieza {selectedTooth} - {inputSurface} - {inputPosition} ({inputMetric === "pocket" ? "Sondaje" : "Recesión"})
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ESQUEMA CLÍNICO DE NIVEL ÓSEO Y MARGEN GINGIVAL (Estilo PerioTools / Universidad de Berna) */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider font-extrabold text-teal-600 dark:text-teal-400">
+                      Esquema Gráfico de Soporte Alveolar
+                    </span>
+                    <h4 className="text-sm font-display font-black text-slate-800 dark:text-slate-100">
+                      Nivel Óseo y Margen Gingival ({activeArch === "upper" ? "Arcada Superior" : "Arcada Inferior"})
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-3 text-[9px] font-medium text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 bg-teal-500 rounded-full inline-block" />
+                      <span>Encía (Gingival)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 bg-rose-500 rounded-full inline-block" />
+                      <span>Fondo Bolsa</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 bg-rose-500/20 border border-rose-500/40 rounded inline-block" />
+                      <span>Bolsa &ge;4mm</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SVG CONTAINER - Scrollable on mobile */}
+                <div className="w-full overflow-x-auto scrollbar-thin pb-2">
+                  <div className="min-w-[920px] select-none">
+                    <svg viewBox="0 0 920 220" className="w-full h-[220px] bg-slate-50/50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800/60">
                       <defs>
-                        <linearGradient id="toothGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#ffffff" />
-                          <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.85" />
+                        {/* Shading gradients */}
+                        <linearGradient id="toothGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.1" />
+                          <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.25" />
                         </linearGradient>
-                        <linearGradient id="implantGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#64748b" />
-                          <stop offset="50%" stopColor="#94a3b8" />
-                          <stop offset="100%" stopColor="#cbd5e1" />
+                        <linearGradient id="activeToothGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.15" />
+                          <stop offset="100%" stopColor="#0d9488" stopOpacity="0.35" />
                         </linearGradient>
+                        <pattern id="bonePattern" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                          <line x1="0" y1="0" x2="0" y2="4" stroke="#94a3b8" strokeWidth="0.5" strokeOpacity="0.15" />
+                        </pattern>
                       </defs>
 
-                      {/* Tooth Anatomy drawings based on FDI specifications */}
-                      {toothIsMissing ? (
-                        /* Missing representation */
-                        <g opacity="0.3">
-                          <line x1="20" y1="20" x2="80" y2="140" stroke="#ef4444" strokeWidth="3" />
-                          <line x1="80" y1="20" x2="20" y2="140" stroke="#ef4444" strokeWidth="3" />
-                        </g>
-                      ) : toothIsImplant ? (
-                        /* Implant structure */
-                        <g>
-                          {/* Implant screw in bone */}
-                          <rect x="42" y="15" width="16" height="65" fill="url(#implantGrad)" rx="2" />
-                          {/* Screw threads details */}
-                          <line x1="40" y1="30" x2="60" y2="33" stroke="#475569" strokeWidth="1.5" />
-                          <line x1="40" y1="42" x2="60" y2="45" stroke="#475569" strokeWidth="1.5" />
-                          <line x1="40" y1="54" x2="60" y2="57" stroke="#475569" strokeWidth="1.5" />
-                          <line x1="40" y1="66" x2="60" y2="69" stroke="#475569" strokeWidth="1.5" />
-                          {/* Metal abutment crown */}
-                          <path d="M 35,80 L 45,80 L 45,95 L 30,115 L 70,115 L 55,95 L 55,80 L 65,80 C 75,95 72,120 62,125 L 38,125 C 28,120 25,95 35,80 Z" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="1.5" />
-                        </g>
-                      ) : activeArch === "upper" ? (
-                        /* Upper Tooth: roots upwards (Y < 80), crown downwards (Y > 80) */
-                        <g>
-                          {/* Roots drawing */}
-                          <path d="M 35,80 C 20,40 38,20 42,10 C 45,25 48,50 48,80 C 50,50 53,25 56,10 C 60,20 78,40 65,80 Z" fill="url(#toothGrad)" stroke="#94a3b8" strokeWidth="1" />
-                          {/* Tooth Crown (pointing down) */}
-                          <path d="M 35,80 C 25,95 28,125 50,132 C 72,125 75,95 65,80 Z" fill="url(#toothGrad)" stroke="#475569" strokeWidth="1.2" />
-                        </g>
-                      ) : (
-                        /* Lower Tooth: root downwards (Y > 80), crown upwards (Y < 80) */
-                        <g>
-                          {/* Roots drawing */}
-                          <path d="M 35,80 C 20,120 38,140 42,150 C 45,135 48,110 48,80 C 50,110 53,135 56,150 C 60,140 78,120 65,80 Z" fill="url(#toothGrad)" stroke="#94a3b8" strokeWidth="1" />
-                          {/* Tooth Crown (pointing up) */}
-                          <path d="M 35,80 C 25,65 28,35 50,28 C 72,35 75,65 65,80 Z" fill="url(#toothGrad)" stroke="#475569" strokeWidth="1.2" />
-                        </g>
-                      )}
+                      {/* 1. CEJ Base (Línea Cero / Cementoenamel Junction) */}
+                      <line x1="10" y1="110" x2="910" y2="110" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3,3" strokeOpacity="0.4" />
+                      <text x="15" y="106" className="text-[8px] font-mono fill-slate-400 font-bold" opacity="0.6">LÍNEA CEJ (0mm)</text>
 
-                      {/* Plotting points - drawing Gingival Margin & Pocket based on selected face */}
-                      {(() => {
-                        if (toothIsMissing) return null;
-                        
-                        const pocketData = inputSurface === "vestibular" 
-                          ? (activeToothData.vestibularPocket || { mesial: 2, central: 1, distal: 2 }) 
-                          : (activeToothData.palatinoPocket || { mesial: 2, central: 1, distal: 2 });
-                        const recessData = inputSurface === "vestibular" 
-                          ? (activeToothData.vestibularRecess || { mesial: 0, central: 0, distal: 0 }) 
-                          : (activeToothData.palatinoRecess || { mesial: 0, central: 0, distal: 0 });
+                      {/* 2. BACKGROUND TEETH SHAPES */}
+                      {teethList.map((num, i) => {
+                        const isSelected = selectedTooth === num;
+                        const isMissing = odontogram?.[num]?.condition === "ausente";
+                        const isImplant = odontogram?.[num]?.condition === "implante";
+                        const xC = i * 56 + 32;
+                        const lastDigit = num % 10;
+                        const family = lastDigit >= 6 ? "molar" : lastDigit === 4 || lastDigit === 5 ? "premolar" : lastDigit === 3 ? "canine" : "incisor";
 
-                        // Baseline CEJ is Y=80.
-                        // For upper teeth, roots go UP, so recession (loss towards root) moves up (decreasing Y).
-                        // Recession value (e.g. 0-6 mm) maps to pixels. Let's use scale of 4.5px per mm.
-                        const scale = 4.5;
-                        const direction = activeArch === "upper" ? -1 : 1;
-
-                        const yCEJ = 80;
-                        const xMesial = 26;
-                        const xCentral = 50;
-                        const xDistal = 74;
-
-                        // Margin offset (NIC REC)
-                        const yMarginM = yCEJ + (recessData.mesial * scale * direction);
-                        const yMarginC = yCEJ + (recessData.central * scale * direction);
-                        const yMarginD = yCEJ + (recessData.distal * scale * direction);
-
-                        // Pocket Bottom offset (REC + Pocket mm)
-                        const yPocketM = yMarginM + (pocketData.mesial * scale * direction);
-                        const yPocketC = yMarginC + (pocketData.central * scale * direction);
-                        const yPocketD = yMarginD + (pocketData.distal * scale * direction);
+                        if (isMissing) return null;
 
                         return (
-                          <g>
-                            {/* Horizontal Millimeter Scale Grid (PerioTools style) */}
-                            {/* CEJ / Baseline 0 Line */}
-                            <line 
-                              x1="12" 
-                              y1={yCEJ} 
-                              x2="88" 
-                              y2={yCEJ} 
-                              stroke="#0d9488" 
-                              strokeWidth="0.8" 
-                              strokeDasharray="3,2" 
-                              opacity="0.8"
-                            />
-                            <text 
-                              x="8" 
-                              y="82" 
-                              fill="#0d9488" 
-                              className="text-[6px] font-mono font-black select-none text-right dark:fill-teal-400" 
-                              textAnchor="end"
-                            >
-                              0
-                            </text>
-                            <text 
-                              x="92" 
-                              y="82" 
-                              fill="#0d9488" 
-                              className="text-[6px] font-mono font-black select-none text-start dark:fill-teal-400" 
-                              textAnchor="start"
-                            >
-                              0
-                            </text>
+                          <g key={`bg-tooth-${num}`} className="transition-all duration-300">
+                            {/* Roots */}
+                            {activeArch === "upper" ? (
+                              family === "molar" ? (
+                                <path 
+                                  d={`M ${xC - 14},110 C ${xC - 14},60 ${xC - 22},40 ${xC - 16},25 C ${xC - 10},40 ${xC - 8},60 ${xC},110 C ${xC + 8},60 ${xC + 10},40 ${xC + 16},25 C ${xC + 22},40 ${xC + 14},60 ${xC + 14},110 Z`} 
+                                  fill={isSelected ? "url(#activeToothGradient)" : "url(#toothGradient)"} 
+                                  stroke={isSelected ? "#14b8a6" : "#cbd5e1"} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "0.8" : "0.35"} 
+                                />
+                              ) : family === "premolar" ? (
+                                <path 
+                                  d={`M ${xC - 10},110 C ${xC - 10},70 ${xC - 12},50 ${xC - 6},30 C ${xC},50 ${xC + 10},70 ${xC + 10},110 Z`} 
+                                  fill={isSelected ? "url(#activeToothGradient)" : "url(#toothGradient)"} 
+                                  stroke={isSelected ? "#14b8a6" : "#cbd5e1"} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "0.8" : "0.35"} 
+                                />
+                              ) : (
+                                <path 
+                                  d={`M ${xC - 9},110 C ${xC - 9},70 ${xC - 4},50 ${xC},20 C ${xC + 4},50 ${xC + 9},70 ${xC + 9},110 Z`} 
+                                  fill={isSelected ? "url(#activeToothGradient)" : "url(#toothGradient)"} 
+                                  stroke={isSelected ? "#14b8a6" : "#cbd5e1"} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "0.8" : "0.35"} 
+                                />
+                              )
+                            ) : (
+                              family === "molar" ? (
+                                <path 
+                                  d={`M ${xC - 14},110 C ${xC - 14},160 ${xC - 22},180 ${xC - 16},195 C ${xC - 10},180 ${xC - 8},160 ${xC},110 C ${xC + 8},160 ${xC + 10},180 ${xC + 16},195 C ${xC + 22},180 ${xC + 14},160 ${xC + 14},110 Z`} 
+                                  fill={isSelected ? "url(#activeToothGradient)" : "url(#toothGradient)"} 
+                                  stroke={isSelected ? "#14b8a6" : "#cbd5e1"} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "0.8" : "0.35"} 
+                                />
+                              ) : family === "premolar" ? (
+                                <path 
+                                  d={`M ${xC - 10},110 C ${xC - 10},150 ${xC - 12},170 ${xC - 6},190 C ${xC},170 ${xC + 10},150 ${xC + 10},110 Z`} 
+                                  fill={isSelected ? "url(#activeToothGradient)" : "url(#toothGradient)"} 
+                                  stroke={isSelected ? "#14b8a6" : "#cbd5e1"} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "0.8" : "0.35"} 
+                                />
+                              ) : (
+                                <path 
+                                  d={`M ${xC - 9},110 C ${xC - 9},150 ${xC - 4},170 ${xC},200 C ${xC + 4},170 ${xC + 9},150 ${xC + 9},110 Z`} 
+                                  fill={isSelected ? "url(#activeToothGradient)" : "url(#toothGradient)"} 
+                                  stroke={isSelected ? "#14b8a6" : "#cbd5e1"} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "0.8" : "0.35"} 
+                                />
+                              )
+                            )}
 
-                            {/* Rootward Milimeter Lines: Even & Odd */}
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((mm) => {
-                              const yLine = yCEJ + (mm * scale * direction);
-                              const isEven = mm % 2 === 0;
-                              return (
-                                <g key={`root-grid-${mm}`} opacity={isEven ? "0.4" : "0.15"}>
-                                  <line 
-                                    x1="12" 
-                                    y1={yLine} 
-                                    x2="88" 
-                                    y2={yLine} 
-                                    stroke={isEven ? "#64748b" : "#94a3b8"} 
-                                    strokeWidth={isEven ? "0.6" : "0.4"} 
-                                    strokeDasharray={isEven ? "2,2" : "1,3"} 
-                                  />
-                                  {isEven && (
-                                    <>
-                                      <text 
-                                        x="8" 
-                                        y={yLine + 2} 
-                                        fill="#64748b" 
-                                        className="text-[5px] font-mono font-bold select-none text-right dark:fill-slate-400"
-                                        textAnchor="end"
-                                      >
-                                        {mm}
-                                      </text>
-                                      <text 
-                                        x="92" 
-                                        y={yLine + 2} 
-                                        fill="#64748b" 
-                                        className="text-[5px] font-mono font-bold select-none text-start dark:fill-slate-400"
-                                        textAnchor="start"
-                                      >
-                                        {mm}
-                                      </text>
-                                    </>
-                                  )}
-                                </g>
-                              );
-                            })}
+                            {/* Crown */}
+                            {activeArch === "upper" ? (
+                              family === "molar" ? (
+                                <path 
+                                  d={`M ${xC - 16},110 Q ${xC - 16},155 ${xC},158 Q ${xC + 16},155 ${xC + 16},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              ) : family === "premolar" ? (
+                                <path 
+                                  d={`M ${xC - 12},110 Q ${xC - 12},150 ${xC},154 Q ${xC + 12},150 ${xC + 12},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              ) : family === "canine" ? (
+                                <path 
+                                  d={`M ${xC - 10},110 Q ${xC - 10},150 ${xC},158 Q ${xC + 10},150 ${xC + 10},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              ) : (
+                                <path 
+                                  d={`M ${xC - 12},110 L ${xC - 10},154 L ${xC + 10},154 L ${xC + 12},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              )
+                            ) : (
+                              family === "molar" ? (
+                                <path 
+                                  d={`M ${xC - 16},110 Q ${xC - 16},65 ${xC},62 Q ${xC + 16},65 ${xC + 16},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              ) : family === "premolar" ? (
+                                <path 
+                                  d={`M ${xC - 12},110 Q ${xC - 12},70 ${xC},66 Q ${xC + 12},70 ${xC + 12},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              ) : family === "canine" ? (
+                                <path 
+                                  d={`M ${xC - 10},110 Q ${xC - 10},70 ${xC},62 Q ${xC + 10},70 ${xC + 10},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              ) : (
+                                <path 
+                                  d={`M ${xC - 12},110 L ${xC - 10},66 L ${xC + 10},66 L ${xC + 12},110 Z`} 
+                                  fill={isImplant ? "rgba(6, 182, 212, 0.08)" : (isSelected ? "rgba(20, 184, 166, 0.1)" : "rgba(255, 255, 255, 0.65)")} 
+                                  stroke={isImplant ? "#06b6d4" : (isSelected ? "#14b8a6" : "#94a3b8")} 
+                                  strokeWidth={isSelected ? "1.5" : "1"} 
+                                  strokeOpacity={isSelected ? "1" : "0.5"} 
+                                />
+                              )
+                            )}
 
-                            {/* Crownward Milimeter Lines (for hyperplasia) */}
-                            {[1, 2, 3, 4].map((mm) => {
-                              const yLine = yCEJ - (mm * scale * direction);
-                              const isEven = mm % 2 === 0;
-                              return (
-                                <g key={`crown-grid-${mm}`} opacity={isEven ? "0.2" : "0.1"}>
-                                  <line 
-                                    x1="12" 
-                                    y1={yLine} 
-                                    x2="88" 
-                                    y2={yLine} 
-                                    stroke="#64748b" 
-                                    strokeWidth="0.5" 
-                                    strokeDasharray="1,2" 
-                                  />
-                                  {isEven && (
-                                    <>
-                                      <text 
-                                        x="8" 
-                                        y={yLine + 2} 
-                                        fill="#64748b" 
-                                        className="text-[4.5px] font-mono font-semibold select-none text-right dark:fill-slate-500"
-                                        textAnchor="end"
-                                      >
-                                        -{mm}
-                                      </text>
-                                      <text 
-                                        x="92" 
-                                        y={yLine + 2} 
-                                        fill="#64748b" 
-                                        className="text-[4.5px] font-mono font-semibold select-none text-start dark:fill-slate-500"
-                                        textAnchor="start"
-                                      >
-                                        -{mm}
-                                      </text>
-                                    </>
-                                  )}
-                                </g>
-                              );
-                            })}
-
-                            {/* Area shaded between CEJ and pocket bottom showing loss of insertion */}
-                            <path 
-                              d={`M 15,${yCEJ} L ${xMesial},${yCEJ} L ${xCentral},${yCEJ} L ${xDistal},${yCEJ} L 85,${yCEJ} L 85,${yPocketD} L ${xDistal},${yPocketD} L ${xCentral},${yPocketC} L ${xMesial},${yPocketM} L 15,${yPocketM} Z`}
-                              fill="rgba(244, 63, 94, 0.12)"
-                              stroke="none"
-                            />
-
-                            {/* Gingival Margin line (Blue/cyan) - Clinical Polyline passing exactly through nodes */}
-                            <path 
-                              d={`M 12,${yMarginM} L ${xMesial},${yMarginM} L ${xCentral},${yMarginC} L ${xDistal},${yMarginD} L 88,${yMarginD}`}
-                              fill="none"
-                              stroke="#06b6d4" 
-                              strokeWidth="2.5" 
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-
-                            {/* Pocket base path (Red) - Clinical Polyline passing exactly through nodes */}
-                            <path 
-                              d={`M 12,${yPocketM} L ${xMesial},${yPocketM} L ${xCentral},${yPocketC} L ${xDistal},${yPocketD} L 88,${yPocketD}`}
-                              fill="none" 
-                              stroke="#ef4444" 
-                              strokeWidth="2.5" 
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeDasharray="2,2"
-                            />
-
-                            {/* Node markers for Gingival Margin (Cyan) */}
-                            <g>
-                              <circle cx={xMesial} cy={yMarginM} r="2.5" fill="#06b6d4" stroke="#ffffff" strokeWidth="0.8" />
-                              <circle cx={xCentral} cy={yMarginC} r="2.5" fill="#06b6d4" stroke="#ffffff" strokeWidth="0.8" />
-                              <circle cx={xDistal} cy={yMarginD} r="2.5" fill="#06b6d4" stroke="#ffffff" strokeWidth="0.8" />
-                            </g>
-
-                            {/* Node markers for Pocket Bottom (Red) */}
-                            <g>
-                              <circle cx={xMesial} cy={yPocketM} r="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="0.8" />
-                              <circle cx={xCentral} cy={yPocketC} r="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="0.8" />
-                              <circle cx={xDistal} cy={yPocketD} r="2.5" fill="#ef4444" stroke="#ffffff" strokeWidth="0.8" />
-                            </g>
-
-                            {/* Active position vertical dashed guide */}
-                            <line 
-                              x1={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
-                              y1="10"
-                              x2={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
-                              y2="150"
-                              stroke="#0d9488"
-                              strokeWidth="1"
-                              strokeDasharray="2,2"
-                              opacity="0.8"
-                            />
-
-                            {/* Position & Metric selector markers (Moves dynamically to match selected parameter: recess vs pocket) */}
-                            {(() => {
-                              const activeY = inputMetric === "pocket"
-                                ? (inputPosition === "mesial" ? yPocketM : inputPosition === "central" ? yPocketC : yPocketD)
-                                : (inputPosition === "mesial" ? yMarginM : inputPosition === "central" ? yMarginC : yMarginD);
-                              return (
-                                <g>
-                                  <circle 
-                                    cx={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
-                                    cy={activeY} 
-                                    r="6" 
-                                    fill={inputMetric === "pocket" ? "#ef4444" : "#06b6d4"} 
-                                    stroke="#ffffff" 
-                                    strokeWidth="1.5"
-                                    className="animate-ping"
-                                    style={{ transformOrigin: "center" }}
-                                  />
-                                  <circle 
-                                    cx={inputPosition === "mesial" ? xMesial : inputPosition === "central" ? xCentral : xDistal}
-                                    cy={activeY} 
-                                    r="4.5" 
-                                    fill={inputMetric === "pocket" ? "#b91c1c" : "#0891b2"} 
-                                    stroke="#ffffff" 
-                                    strokeWidth="1.5"
-                                  />
-                                </g>
-                              );
-                            })()}
-
-                            {/* Clickable Overlay Zones for Mesial, Central, Distal */}
-                            <g>
-                              {/* Left / Mesial Target */}
-                              <rect 
-                                x="10" 
-                                y="10" 
-                                width="28" 
-                                height="140" 
-                                fill="transparent" 
-                                className="cursor-pointer hover:fill-teal-500/5 transition-all"
-                                onClick={() => {
-                                  setInputPosition("mesial");
-                                }}
-                              />
-                              {/* Middle / Central Target */}
-                              <rect 
-                                x="38" 
-                                y="10" 
-                                width="24" 
-                                height="140" 
-                                fill="transparent" 
-                                className="cursor-pointer hover:fill-teal-500/5 transition-all"
-                                onClick={() => {
-                                  setInputPosition("central");
-                                }}
-                              />
-                              {/* Right / Distal Target */}
-                              <rect 
-                                x="62" 
-                                y="10" 
-                                width="28" 
-                                height="140" 
-                                fill="transparent" 
-                                className="cursor-pointer hover:fill-teal-500/5 transition-all"
-                                onClick={() => {
-                                  setInputPosition("distal");
-                                }}
-                              />
-                            </g>
+                            {/* Label of active implants */}
+                            {isImplant && (
+                              <text x={xC} y={activeArch === "upper" ? 134 : 86} textAnchor="middle" className="text-[7.5px] font-mono fill-cyan-500 font-extrabold">IMPLANT</text>
+                            )}
                           </g>
                         );
+                      })}
+
+                      {/* 3. BONE FILL / ALVEOLAR SUPPORT PROFILE */}
+                      {(() => {
+                        const bonePoints: string[] = [];
+                        teethList.forEach((num, i) => {
+                          const isMissing = odontogram?.[num]?.condition === "ausente";
+                          const xL = i * 56 + 18;
+                          const xC = i * 56 + 32;
+                          const xR = i * 56 + 46;
+                          const yCEJ = 110;
+
+                          if (isMissing) {
+                            bonePoints.push(`${xL},${yCEJ}`, `${xC},${yCEJ}`, `${xR},${yCEJ}`);
+                          } else {
+                            const metrics = getToothMetrics(num);
+                            const yBL = activeArch === "upper" ? 110 - (metrics.left.recess + metrics.left.pocket) * 6 : 110 + (metrics.left.recess + metrics.left.pocket) * 6;
+                            const yBC = activeArch === "upper" ? 110 - (metrics.central.recess + metrics.central.pocket) * 6 : 110 + (metrics.central.recess + metrics.central.pocket) * 6;
+                            const yBR = activeArch === "upper" ? 110 - (metrics.right.recess + metrics.right.pocket) * 6 : 110 + (metrics.right.recess + metrics.right.pocket) * 6;
+                            bonePoints.push(`${xL},${yBL}`, `${xC},${yBC}`, `${xR},${yBR}`);
+                          }
+                        });
+
+                        const edgeY = activeArch === "upper" ? 10 : 210;
+                        const boneFillPath = `M 18,${edgeY} L 902,${edgeY} L 902,${bonePoints[bonePoints.length - 1].split(',')[1]} ${bonePoints.slice().reverse().map(p => "L " + p).join(" ")} Z`;
+
+                        return (
+                          <path 
+                            d={boneFillPath} 
+                            fill="url(#bonePattern)" 
+                            className="fill-slate-300/10 dark:fill-slate-400/5" 
+                            stroke="#cbd5e1" 
+                            strokeWidth="1" 
+                            strokeDasharray="2,2" 
+                            strokeOpacity="0.15" 
+                          />
+                        );
                       })()}
+
+                      {/* 4. PERIODONTAL POCKET DISEASES HIGHLIGHTS (BOLSAS >= 4mm) */}
+                      {teethList.map((num, i) => {
+                        const isMissing = odontogram?.[num]?.condition === "ausente";
+                        if (isMissing) return null;
+
+                        const xL = i * 56 + 18;
+                        const xC = i * 56 + 32;
+                        const xR = i * 56 + 46;
+
+                        const metrics = getToothMetrics(num);
+                        const yGL = activeArch === "upper" ? 110 - metrics.left.recess * 6 : 110 + metrics.left.recess * 6;
+                        const yGC = activeArch === "upper" ? 110 - metrics.central.recess * 6 : 110 + metrics.central.recess * 6;
+                        const yGR = activeArch === "upper" ? 110 - metrics.right.recess * 6 : 110 + metrics.right.recess * 6;
+
+                        const yBL = activeArch === "upper" ? 110 - (metrics.left.recess + metrics.left.pocket) * 6 : 110 + (metrics.left.recess + metrics.left.pocket) * 6;
+                        const yBC = activeArch === "upper" ? 110 - (metrics.central.recess + metrics.central.pocket) * 6 : 110 + (metrics.central.recess + metrics.central.pocket) * 6;
+                        const yBR = activeArch === "upper" ? 110 - (metrics.right.recess + metrics.right.pocket) * 6 : 110 + (metrics.right.recess + metrics.right.pocket) * 6;
+
+                        const hasSeverePocket = metrics.left.pocket >= 4 || metrics.central.pocket >= 4 || metrics.right.pocket >= 4;
+
+                        return (
+                          <path
+                            key={`pocket-fill-${num}`}
+                            d={`M ${xL},${yGL} L ${xC},${yGC} L ${xR},${yGR} L ${xR},${yBR} L ${xC},${yBC} L ${xL},${yBL} Z`}
+                            fill={hasSeverePocket ? "rgba(239, 68, 68, 0.2)" : "rgba(20, 184, 166, 0.05)"}
+                            stroke={hasSeverePocket ? "rgba(239, 68, 68, 0.35)" : "rgba(20, 184, 166, 0.15)"}
+                            strokeWidth="1"
+                            strokeDasharray={hasSeverePocket ? "2,1" : "none"}
+                          />
+                        );
+                      })}
+
+                      {/* 5. CONTINUOUS GINGIVAL MARGIN LINE (Línea de la Encía) */}
+                      {(() => {
+                        const gingivalPoints: string[] = [];
+                        teethList.forEach((num, i) => {
+                          const isMissing = odontogram?.[num]?.condition === "ausente";
+                          const xL = i * 56 + 18;
+                          const xC = i * 56 + 32;
+                          const xR = i * 56 + 46;
+                          const yCEJ = 110;
+
+                          if (isMissing) {
+                            gingivalPoints.push(`${xL},${yCEJ}`, `${xC},${yCEJ}`, `${xR},${yCEJ}`);
+                          } else {
+                            const metrics = getToothMetrics(num);
+                            const yGL = activeArch === "upper" ? 110 - metrics.left.recess * 6 : 110 + metrics.left.recess * 6;
+                            const yGC = activeArch === "upper" ? 110 - metrics.central.recess * 6 : 110 + metrics.central.recess * 6;
+                            const yGR = activeArch === "upper" ? 110 - metrics.right.recess * 6 : 110 + metrics.right.recess * 6;
+                            gingivalPoints.push(`${xL},${yGL}`, `${xC},${yGC}`, `${xR},${yGR}`);
+                          }
+                        });
+
+                        return (
+                          <path 
+                            d={`M ${gingivalPoints.join(" L ")}`} 
+                            fill="none" 
+                            stroke="#14b8a6" 
+                            strokeWidth="2.5" 
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        );
+                      })()}
+
+                      {/* 6. CONTINUOUS BONE LEVEL LINE (Fondo de Bolsa / Margen Óseo) */}
+                      {(() => {
+                        const bonePoints: string[] = [];
+                        teethList.forEach((num, i) => {
+                          const isMissing = odontogram?.[num]?.condition === "ausente";
+                          const xL = i * 56 + 18;
+                          const xC = i * 56 + 32;
+                          const xR = i * 56 + 46;
+                          const yCEJ = 110;
+
+                          if (isMissing) {
+                            bonePoints.push(`${xL},${yCEJ}`, `${xC},${yCEJ}`, `${xR},${yCEJ}`);
+                          } else {
+                            const metrics = getToothMetrics(num);
+                            const yBL = activeArch === "upper" ? 110 - (metrics.left.recess + metrics.left.pocket) * 6 : 110 + (metrics.left.recess + metrics.left.pocket) * 6;
+                            const yBC = activeArch === "upper" ? 110 - (metrics.central.recess + metrics.central.pocket) * 6 : 110 + (metrics.central.recess + metrics.central.pocket) * 6;
+                            const yBR = activeArch === "upper" ? 110 - (metrics.right.recess + metrics.right.pocket) * 6 : 110 + (metrics.right.recess + metrics.right.pocket) * 6;
+                            bonePoints.push(`${xL},${yBL}`, `${xC},${yBC}`, `${xR},${yBR}`);
+                          }
+                        });
+
+                        return (
+                          <path 
+                            d={`M ${bonePoints.join(" L ")}`} 
+                            fill="none" 
+                            stroke="#f43f5e" 
+                            strokeWidth="2" 
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        );
+                      })()}
+
+                      {/* 7. INTERACTIVE NODES & POCKET VALUE TEXTS */}
+                      {teethList.map((num, i) => {
+                        const isSelected = selectedTooth === num;
+                        const isMissing = odontogram?.[num]?.condition === "ausente";
+                        if (isMissing) {
+                          // Draw a subtle red X over missing teeth columns
+                          const xC = i * 56 + 32;
+                          return (
+                            <g key={`missing-mark-${num}`} opacity="0.25">
+                              <line x1={xC - 14} y1="35" x2={xC + 14} y2="185" stroke="#f43f5e" strokeWidth="2.5" />
+                              <line x1={xC + 14} y1="35" x2={xC - 14} y2="185" stroke="#f43f5e" strokeWidth="2.5" />
+                              <text x={xC} y="114" textAnchor="middle" className="text-[9px] font-bold fill-rose-500 font-sans tracking-widest">AUSENTE</text>
+                            </g>
+                          );
+                        }
+
+                        const xL = i * 56 + 18;
+                        const xC = i * 56 + 32;
+                        const xR = i * 56 + 46;
+
+                        const metrics = getToothMetrics(num);
+
+                        const yBL = activeArch === "upper" ? 110 - (metrics.left.recess + metrics.left.pocket) * 6 : 110 + (metrics.left.recess + metrics.left.pocket) * 6;
+                        const yBC = activeArch === "upper" ? 110 - (metrics.central.recess + metrics.central.pocket) * 6 : 110 + (metrics.central.recess + metrics.central.pocket) * 6;
+                        const yBR = activeArch === "upper" ? 110 - (metrics.right.recess + metrics.right.pocket) * 6 : 110 + (metrics.right.recess + metrics.right.pocket) * 6;
+
+                        const valOffset = activeArch === "upper" ? -8 : 14;
+
+                        return (
+                          <g key={`nodes-${num}`} className="transition-all duration-200">
+                            {/* Column Selection Border Highlighter */}
+                            {isSelected && (
+                              <rect 
+                                x={i * 56 + 7} 
+                                y="10" 
+                                width="50" 
+                                height="200" 
+                                fill="none" 
+                                stroke="#14b8a6" 
+                                strokeWidth="2" 
+                                rx="10" 
+                                className="opacity-70"
+                                strokeDasharray="3,1"
+                              />
+                            )}
+
+                            {/* Node Left */}
+                            <circle cx={xL} cy={yBL} r={isSelected && inputPosition === "mesial" ? "4.5" : "3.5"} className={`stroke-white stroke-1 ${metrics.left.pocket >= 4 ? 'fill-rose-500' : 'fill-teal-500'}`} />
+                            <text x={xL} y={yBL + valOffset} textAnchor="middle" className={`text-[8.5px] font-mono font-black ${metrics.left.pocket >= 4 ? 'fill-rose-500 dark:fill-rose-400 font-extrabold' : 'fill-slate-600 dark:fill-slate-300'}`}>
+                              {metrics.left.pocket}
+                            </text>
+
+                            {/* Node Central */}
+                            <circle cx={xC} cy={yBC} r={isSelected && inputPosition === "central" ? "4.5" : "3.5"} className={`stroke-white stroke-1 ${metrics.central.pocket >= 4 ? 'fill-rose-500' : 'fill-teal-500'}`} />
+                            <text x={xC} y={yBC + valOffset} textAnchor="middle" className={`text-[8.5px] font-mono font-black ${metrics.central.pocket >= 4 ? 'fill-rose-500 dark:fill-rose-400 font-extrabold' : 'fill-slate-600 dark:fill-slate-300'}`}>
+                              {metrics.central.pocket}
+                            </text>
+
+                            {/* Node Right */}
+                            <circle cx={xR} cy={yBR} r={isSelected && inputPosition === "distal" ? "4.5" : "3.5"} className={`stroke-white stroke-1 ${metrics.right.pocket >= 4 ? 'fill-rose-500' : 'fill-teal-500'}`} />
+                            <text x={xR} y={yBR + valOffset} textAnchor="middle" className={`text-[8.5px] font-mono font-black ${metrics.right.pocket >= 4 ? 'fill-rose-500 dark:fill-rose-400 font-extrabold' : 'fill-slate-600 dark:fill-slate-300'}`}>
+                              {metrics.right.pocket}
+                            </text>
+
+                            {/* Column Selection Trigger Backdrop */}
+                            <rect 
+                              x={i * 56 + 8} 
+                              y="10" 
+                              width="48" 
+                              height="200" 
+                              fill="transparent" 
+                              className="cursor-pointer hover:fill-teal-500/5 transition-all duration-150" 
+                              onClick={() => setSelectedTooth(num)} 
+                            />
+
+                            {/* Tooth FDI Number Header/Footer text */}
+                            <text 
+                              x={xC} 
+                              y={activeArch === "upper" ? 212 : 18} 
+                              textAnchor="middle" 
+                              className={`text-[9.5px] font-mono font-black ${isSelected ? 'fill-teal-500 font-extrabold scale-110' : 'fill-slate-400 dark:fill-slate-500'}`}
+                            >
+                              {num}
+                            </text>
+                          </g>
+                        );
+                      })}
                     </svg>
                   </div>
+                </div>
 
-                  {/* Anatomical Explanation and Details Side Column */}
-                  <div className="flex-1 space-y-3 w-full">
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                        {inputSurface === "vestibular" ? "Vista Externa (Vestibular)" : "Vista Interna (Palatino/Lingual)"}
-                      </span>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                        {toothIsImplant ? (
-                          <span className="bg-cyan-500/10 text-cyan-500 text-xs px-2 py-0.5 rounded-md font-mono">Abutment Implant</span>
-                        ) : (
-                          <span>Pieza Anatomía {isUpper ? "Anisognata Maxilar Superior" : "Anisognata Mandibular Inferior"}</span>
-                        )}
-                      </h4>
-                    </div>
-
-                    {/* REAL-TIME DYNAMIC METRICS FOR SELECTED POSITION */}
-                    {(() => {
-                      if (toothIsMissing) return null;
-                      const pocketData = inputSurface === "vestibular" 
-                        ? (activeToothData.vestibularPocket || { mesial: 2, central: 1, distal: 2 }) 
-                        : (activeToothData.palatinoPocket || { mesial: 2, central: 1, distal: 2 });
-                      const recessData = inputSurface === "vestibular" 
-                        ? (activeToothData.vestibularRecess || { mesial: 0, central: 0, distal: 0 }) 
-                        : (activeToothData.palatinoRecess || { mesial: 0, central: 0, distal: 0 });
-
-                      const scale = 4.5;
-                      const currentPocketVal = pocketData[inputPosition] ?? 2;
-                      const currentRecessVal = recessData[inputPosition] ?? 0;
-                      const currentCalVal = currentPocketVal + currentRecessVal;
-
-                      return (
-                        <div className="p-3 bg-teal-500/5 dark:bg-teal-950/10 border border-teal-550/10 rounded-xl space-y-2 animate-fade-in">
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="font-bold text-slate-500 dark:text-slate-400 uppercase">Valores Punto Seleccionado:</span>
-                            <span className="font-mono bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded font-black uppercase text-[9px] tracking-wider">
-                              Zona {inputPosition}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-center font-mono">
-                            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 p-2 rounded-lg">
-                              <span className="text-[9px] text-slate-400 dark:text-slate-550 block font-sans font-medium uppercase">Sondaje</span>
-                              <span className={`text-sm font-black ${currentPocketVal >= 4 ? 'text-rose-500 animate-pulse' : 'text-slate-700 dark:text-slate-200'}`}>
-                                {currentPocketVal}mm
-                              </span>
-                            </div>
-                            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 p-2 rounded-lg">
-                              <span className="text-[9px] text-slate-400 dark:text-slate-550 block font-sans font-medium uppercase">Recesión</span>
-                              <span className="text-sm font-black text-cyan-550 dark:text-cyan-400">
-                                {currentRecessVal}mm
-                              </span>
-                            </div>
-                            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 p-2 rounded-lg">
-                              <span className="text-[9px] text-slate-400 dark:text-slate-550 block font-sans font-medium uppercase">NIC (CAL)</span>
-                              <span className={`text-sm font-black ${currentCalVal >= 5 ? 'text-rose-500' : 'text-teal-555 dark:text-teal-400'}`}>
-                                {currentCalVal}mm
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <div className="space-y-2 text-[10.5px] leading-relaxed text-slate-600 dark:text-slate-350 bg-slate-50/60 dark:bg-slate-800/20 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-cyan-400 rounded-full inline-block" />
-                        <span><span className="font-semibold text-slate-700 dark:text-slate-300">Margen Gingival (Celeste)</span>: Determina la recesión.</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-rose-500 rounded-full inline-block" />
-                        <span><span className="font-semibold text-slate-700 dark:text-slate-300">Fondo del Surco (Rojo)</span>: Profundidad del sondaje.</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-rose-500/20 rounded-xs inline-block border border-rose-400/20" />
-                        <span><span className="font-semibold text-slate-700 dark:text-slate-300">Zona Sombreada (Rojo claro)</span>: Pérdida de inserción (CAL).</span>
-                      </div>
-                    </div>
+                {/* Micro instructions */}
+                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 text-[10px] text-slate-450 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
+                    <span><strong>Interactivo:</strong> Haz clic sobre cualquier diente en el esquema para seleccionarlo e iniciar su edición de sondaje.</span>
                   </div>
+                  <span className="font-mono font-bold text-[9px] bg-slate-200/50 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                    FDI {selectedTooth} activo
+                  </span>
                 </div>
               </div>
 
@@ -1171,7 +1753,7 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                             max="15"
                             value={pocketVal}
                             onChange={(e) => handlePocketChange(selectedTooth, pocketMetric, pos, parseInt(e.target.value) || 0)}
-                            className={`w-full py-1.5 text-center font-display font-black text-base bg-white dark:bg-slate-800 rounded-lg border outline-none focus:ring-2 focus:ring-teal-500/20 transition-all ${
+                            className={`w-full py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-[0] text-center font-display font-black text-base bg-white dark:bg-slate-800 rounded-lg border outline-none focus:ring-2 focus:ring-teal-500/20 transition-all ${
                               isSevere 
                                 ? "border-rose-400 text-rose-500 bg-rose-50/10" 
                                 : "border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
@@ -1190,7 +1772,7 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                             max="10"
                             value={recessVal}
                             onChange={(e) => handlePocketChange(selectedTooth, recessMetric, pos, parseInt(e.target.value) || 0)}
-                            className="w-full py-1.5 text-center font-display font-bold text-xs bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-teal-350/10"
+                            className="w-full py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-[0] text-center font-display font-bold text-xs bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-teal-350/10"
                           />
                         </div>
 
@@ -1203,44 +1785,44 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
                         </div>
 
                         {/* Interactive toggle buttons */}
-                        <div className="flex justify-center gap-1.5 pt-1 border-t border-slate-105 dark:border-slate-800/50">
+                        <div className="flex flex-wrap justify-center gap-1.5 pt-1 border-t border-slate-105 dark:border-slate-800/50">
                           {/* Bleeding (BOP) */}
                           <button 
                             onClick={() => handleToggleFlag(selectedTooth, bopMetric, pos)}
-                            className={`p-1.5 rounded-lg transition-all border shrink-0 cursor-pointer ${
+                            className={`p-2.5 sm:p-1.5 min-w-[44px] sm:min-w-[0] min-h-[44px] sm:min-h-[0] rounded-lg transition-all border flex items-center justify-center shrink-0 cursor-pointer ${
                               bopActive 
                                 ? "bg-red-500 text-white border-red-500 shadow-xs" 
                                 : "bg-white dark:bg-slate-800 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 border-slate-200 dark:border-slate-800"
                             }`}
                             title="Hemorragia al sondaje (BOP)"
                           >
-                            <Droplet className="w-3.5 h-3.5" />
+                            <Droplet className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                           </button>
 
                           {/* Plaque Index (PI) */}
                           <button 
                             onClick={() => handleToggleFlag(selectedTooth, plaqueMetric, pos)}
-                            className={`p-1.5 rounded-lg transition-all border shrink-0 cursor-pointer ${
+                            className={`p-2.5 sm:p-1.5 min-w-[44px] sm:min-w-[0] min-h-[44px] sm:min-h-[0] rounded-lg transition-all border flex items-center justify-center shrink-0 cursor-pointer ${
                               plaqueActive 
                                 ? "bg-amber-400 text-slate-800 border-amber-400 shadow-xs" 
                                 : "bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/15 border-slate-200 dark:border-slate-800"
                             }`}
                             title="Presencia de Placa Bacteriana"
                           >
-                            <CircleDot className="w-3.5 h-3.5" />
+                            <CircleDot className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                           </button>
 
                           {/* Suppuration outflow toggle */}
                           <button 
                             onClick={() => handleToggleSupuracion(selectedTooth, suppMetric, pos)}
-                            className={`p-1.5 rounded-lg transition-all border shrink-0 cursor-pointer ${
+                            className={`p-2.5 sm:p-1.5 min-w-[44px] sm:min-w-[0] min-h-[44px] sm:min-h-[0] rounded-lg transition-all border flex items-center justify-center shrink-0 cursor-pointer ${
                               suppActive 
                                 ? "bg-cyan-500 text-white border-cyan-500 shadow-xs" 
                                 : "bg-white dark:bg-slate-800 text-slate-450 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/15 border-slate-200 dark:border-slate-800"
                             }`}
                             title="Supuración Activa (Pus)"
                           >
-                            <span className="text-[7.5px] font-sans font-bold block">Pus</span>
+                            <span className="text-[10px] sm:text-[7.5px] font-sans font-bold block">Pus</span>
                           </button>
                         </div>
                       </div>
