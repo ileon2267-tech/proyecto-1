@@ -32,77 +32,82 @@ const DENTITO_KNOWLEDGE: Record<string, string> = {
   "dentito": "Soy Dentito, el asistente clínico inteligente integrado en PerioDash. Puedo apoyarte en la búsqueda de expedientes, análisis periodontal y protocolos clínicos."
 };
 
-const ParticleSystem = () => {
+const ParticleSystem = React.memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
-    let width = canvas.width;
-    let height = canvas.height;
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
     
-    // Quantum particle system params from user prompt
-    const PARTICLE_COUNT = 30;
-    const particles: any[] = [];
-    
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      particles.push({
-        angle: Math.random() * Math.PI * 2,
-        orbitRadius: 30 + Math.random() * 20,
-        size: 0.5 + Math.random() * 1.5,
-        speed: 0.002 + Math.random() * 0.015,
-        opacity: 0.3 + Math.random() * 0.7,
-        orbitInclination: Math.random() * Math.PI,
-        twinkle: Math.random() * Math.PI * 2,
-      });
-    }
+    // Quantum particle system params
+    const PARTICLE_COUNT = 16;
+    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+      angle: Math.random() * Math.PI * 2,
+      orbitRadius: 20 + Math.random() * 18,
+      size: 0.8 + Math.random() * 1.2,
+      speed: 0.005 + Math.random() * 0.01,
+      opacity: 0.4 + Math.random() * 0.5,
+      orbitInclination: Math.random() * Math.PI,
+      twinkle: Math.random() * Math.PI * 2,
+    }));
+
+    // Pre-create gradient
+    const gradient = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, 24);
+    gradient.addColorStop(0, "rgba(20, 184, 166, 0.85)");
+    gradient.addColorStop(0.5, "rgba(45, 212, 191, 0.35)");
+    gradient.addColorStop(1, "rgba(20, 184, 166, 0)");
 
     let animationFrameId: number;
     let time = 0;
 
     const render = () => {
+      if (document.hidden) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+
       ctx.clearRect(0, 0, width, height);
-      const centerX = width / 2;
-      const centerY = height / 2;
-      time += 0.05;
+      time += 0.04;
 
       // Draw glowing core
-      const gradient = ctx.createRadialGradient(centerX, centerY, 5, centerX, centerY, 25);
-      gradient.addColorStop(0, "rgba(20, 184, 166, 0.8)");
-      gradient.addColorStop(0.5, "rgba(45, 212, 191, 0.4)");
-      gradient.addColorStop(1, "rgba(20, 184, 166, 0)");
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 25 + Math.sin(time) * 2, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, 24 + Math.sin(time) * 1.5, 0, Math.PI * 2);
       ctx.fill();
 
       // Eyes
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
       ctx.beginPath();
-      ctx.arc(centerX - 6, centerY - 2, 2.5, 0, Math.PI * 2); // left eye
-      ctx.arc(centerX + 6, centerY - 2, 2.5, 0, Math.PI * 2); // right eye
+      ctx.arc(centerX - 5.5, centerY - 2, 2.2, 0, Math.PI * 2);
+      ctx.arc(centerX + 5.5, centerY - 2, 2.2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw particles
-      particles.forEach((p) => {
+      // Draw particles without string allocations
+      ctx.fillStyle = "#86efac";
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const p = particles[i];
         p.angle += p.speed;
-        p.twinkle += 0.1;
+        p.twinkle += 0.08;
         
-        // 3D-ish projection
         const x = centerX + Math.cos(p.angle) * p.orbitRadius;
         const verticalOffset = Math.sin(p.angle) * Math.sin(p.orbitInclination) * p.orbitRadius;
         const y = centerY + verticalOffset;
         
         const currentOpacity = p.opacity * (0.5 + 0.5 * Math.sin(p.twinkle));
+        ctx.globalAlpha = Math.max(0.1, currentOpacity);
         
-        ctx.fillStyle = `rgba(134, 239, 172, ${currentOpacity})`;
         ctx.beginPath();
         ctx.arc(x, y, p.size, 0, Math.PI * 2);
         ctx.fill();
-      });
+      }
+      ctx.globalAlpha = 1;
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -111,12 +116,12 @@ const ParticleSystem = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
-  return <canvas ref={canvasRef} width={120} height={120} className="w-full h-full drop-shadow-[0_0_15px_rgba(45,212,191,0.5)]" />;
-};
+  return <canvas ref={canvasRef} width={100} height={100} className="w-full h-full drop-shadow-[0_0_10px_rgba(45,212,191,0.4)]" />;
+});
 
 export type DentitoPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left" | "fullscreen";
 
-export default function DentitoChat({ 
+function DentitoChatComponent({ 
   activePatient,
   patients = [],
   appointments = [],
@@ -296,6 +301,12 @@ He completado el análisis espectrográfico e interpretación semántica del arc
     if (typeof window !== "undefined") {
       setSpeechSupported(!!window.speechSynthesis);
     }
+
+    const handleOpenDentito = () => {
+      setIsMinimized(false);
+    };
+    window.addEventListener("periodash-open-dentito", handleOpenDentito);
+    return () => window.removeEventListener("periodash-open-dentito", handleOpenDentito);
   }, []);
 
   const speak = (text: string) => {
@@ -944,53 +955,72 @@ He completado el análisis espectrográfico e interpretación semántica del arc
         )}
       </AnimatePresence>
 
-      <motion.div 
-        key={positionState}
-        layout
-        drag={positionState !== "fullscreen"}
-        dragConstraints={getDragConstraints()}
-        dragElastic={0.05}
-        dragMomentum={false}
-        onDragStart={() => {
-          isDraggingRef.current = true;
-        }}
-        onDragEnd={() => {
-          setTimeout(() => {
-            isDraggingRef.current = false;
-          }, 60);
-        }}
-        onTap={() => {
-          if (isMinimized) {
-            setIsMinimized(false);
-          }
-        }}
-        className={`fixed z-[99] print:hidden transition-[background-color,border-color,shadow,opacity] duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.2)] flex flex-col
-          bg-white/45 dark:bg-slate-900/65 backdrop-blur-2xl border border-white/60 dark:border-white/10
-          ${getPositionClasses()}`}
-      >
+      <AnimatePresence mode="wait">
         {isMinimized ? (
-          <div 
-            title="Asistente Dentito - Soporte Clínico"
-            className="w-full h-full flex items-center justify-center cursor-pointer relative group"
+          /* MINIMIZED FLOATING TRIGGER BUTTON */
+          <motion.div
+            key="dentito-minimized-orb"
+            initial={{ scale: 0.8, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.8, opacity: 0, y: 10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={() => setIsMinimized(false)}
+            title="Abrir Asistente Clínico Dentito"
+            className={`fixed z-[99] print:hidden cursor-pointer group select-none ${
+              positionState === "bottom-left" ? "bottom-20 left-4 md:bottom-24 md:left-6" :
+              positionState === "top-right" ? "top-20 right-4 md:top-6 md:right-6" :
+              positionState === "top-left" ? "top-20 left-4 md:top-6 md:left-6" :
+              "bottom-20 right-4 md:bottom-24 md:right-6" // default bottom-right
+            }`}
           >
-             <div className="relative w-12 h-12 flex items-center justify-center rounded-full p-[1.5px] shadow-sm">
+            <div className="relative p-1 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border border-teal-500/40 dark:border-teal-400/30 rounded-full shadow-[0_10px_35px_rgba(20,184,166,0.35)] dark:shadow-[0_10px_35px_rgba(20,184,166,0.5)] flex items-center gap-2.5 px-3 py-2 hover:scale-105 active:scale-95 transition-all">
+              <div className="relative w-10 h-10 flex items-center justify-center rounded-full shrink-0">
                 <div className="absolute inset-0 neon-rainbow-bg rounded-full pointer-events-none opacity-80 animate-spin-slow" />
                 <div className="absolute inset-[1.5px] bg-slate-100 dark:bg-slate-950 rounded-full z-0 pointer-events-none" />
                 <div className="relative z-10 w-full h-full rounded-full overflow-hidden flex items-center justify-center">
-                   <ParticleSystem />
+                  <ParticleSystem />
                 </div>
-             </div>
-             {/* Breathing background effect */}
-             <div className="absolute inset-2 bg-teal-500/20 rounded-full animate-ping scale-75 opacity-30 pointer-events-none" />
-          </div>
+              </div>
+              
+              <div className="pr-1.5 hidden sm:flex flex-col text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-display font-black text-xs text-slate-800 dark:text-white">Dentito</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                </div>
+                <span className="text-[9px] font-bold text-teal-600 dark:text-teal-400 tracking-tight">Copiloto IA</span>
+              </div>
+            </div>
+          </motion.div>
         ) : (
-          <>
+          /* FULL CHAT MODAL CONTAINER */
+          <motion.div 
+            key={`dentito-chat-window-${positionState}`}
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            drag={positionState !== "fullscreen"}
+            dragConstraints={getDragConstraints()}
+            dragElastic={0.05}
+            dragMomentum={false}
+            onDragStart={() => {
+              isDraggingRef.current = true;
+            }}
+            onDragEnd={() => {
+              setTimeout(() => {
+                isDraggingRef.current = false;
+              }, 60);
+            }}
+            className={`fixed z-[99] print:hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col
+              bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80
+              ${getPositionClasses()}`}
+          >
             {/* Header - Glassmorphic */}
             <div 
-              className="flex items-center justify-between px-5 py-3 border-b border-white/20 dark:border-white/5 cursor-grab active:cursor-grabbing relative bg-gradient-to-br from-teal-400/10 to-transparent select-none"
+              className="flex items-center justify-between px-5 py-3 border-b border-slate-200/60 dark:border-slate-800/80 cursor-grab active:cursor-grabbing relative bg-gradient-to-br from-teal-500/10 via-transparent to-transparent select-none shrink-0"
             >
-              <div className="flex items-center gap-4">
-                <div className="relative w-[48px] h-[48px] flex items-center justify-center rounded-full shadow-inner p-[2px] shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="relative w-[42px] h-[42px] flex items-center justify-center rounded-full shadow-inner p-[2px] shrink-0">
                    <div className="absolute inset-0 neon-rainbow-bg rounded-full pointer-events-none opacity-100" />
                    <div className="absolute inset-[2px] bg-slate-100 dark:bg-slate-900 rounded-full z-0 pointer-events-none" />
                    <div className="relative z-10 w-full h-full rounded-full overflow-hidden flex items-center justify-center border border-white/30 dark:border-white/5 bg-slate-50 dark:bg-slate-900">
@@ -1026,7 +1056,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                 <div className="relative">
                   <button 
                     onClick={() => setShowPositionMenu(!showPositionMenu)}
-                    className="p-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 rounded-xl transition-all cursor-pointer border border-white/20 dark:border-white/5 text-slate-600 dark:text-slate-300 flex items-center gap-1"
+                    className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-xl transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 flex items-center gap-1"
                     title="Trasladar / Posicionar"
                   >
                     <Move className="w-3.5 h-3.5 text-teal-500" />
@@ -1088,7 +1118,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                     className={`p-2 rounded-full transition-all cursor-pointer border ${
                       ttsEnabled 
                         ? "bg-teal-500/10 border-teal-500/30 text-teal-500" 
-                        : "bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 border-white/20 dark:border-white/5 text-slate-500 dark:text-slate-400"
+                        : "bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border-slate-200/60 dark:border-slate-700/50 text-slate-500 dark:text-slate-400"
                     }`}
                     title={ttsEnabled ? "Desactivar lectura de voz (manos libres)" : "Activar lectura de voz (manos libres)"}
                   >
@@ -1102,7 +1132,8 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                     setIsMinimized(true);
                     setShowPositionMenu(false);
                   }}
-                  className="p-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 rounded-full transition-all cursor-pointer border border-white/20 dark:border-white/5 text-slate-600 dark:text-slate-300"
+                  className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-full transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/50 text-slate-600 dark:text-slate-300"
+                  title="Minimizar Dentito"
                 >
                   <Minimize2 className="w-4 h-4" />
                 </button>
@@ -1170,7 +1201,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                 {messages.map((m) => {
                   const isBot = m.role === "assistant";
                   return (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={m.id} className={`flex gap-3 ${isBot ? "justify-start" : "justify-end"} relative z-20`}>
+                    <div key={m.id} className={`flex gap-3 ${isBot ? "justify-start" : "justify-end"} relative z-20 animate-fade-in`}>
                       <div className={`p-4 max-w-[88%] md:max-w-[85%] rounded-[1.2rem] leading-relaxed select-text drop-shadow-sm ${
                         isBot 
                           ? "bg-white/80 dark:bg-slate-800/85 backdrop-blur-md text-slate-800 dark:text-slate-100 rounded-tl-sm border border-white dark:border-slate-700/80 font-medium" 
@@ -1184,7 +1215,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                           m.content
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
                 {loading && (
@@ -1376,9 +1407,11 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                 </button>
               </div>
             </div>
-          </>
+          </motion.div>
         )}
-      </motion.div>
+      </AnimatePresence>
     </>
   );
 }
+
+export default React.memo(DentitoChatComponent);

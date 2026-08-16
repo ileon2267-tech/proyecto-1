@@ -9,7 +9,7 @@ interface SpotlightProps {
   onNavigate: (tab: string) => void;
 }
 
-export default function Spotlight({ patients, onSelectPatient, onNavigate }: SpotlightProps) {
+function SpotlightComponent({ patients, onSelectPatient, onNavigate }: SpotlightProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -155,3 +155,5 @@ export default function Spotlight({ patients, onSelectPatient, onNavigate }: Spo
     </AnimatePresence>
   );
 }
+
+export default React.memo(SpotlightComponent);

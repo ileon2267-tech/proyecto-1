@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Patient } from "../types";
+import { SpecialtyToolsSuite } from "./SpecialtyToolsSuite";
+import RehabSchema2D from "./RehabSchema2D";
 import { 
   ShieldAlert, 
   Activity, 
@@ -565,81 +567,7 @@ export default function SpecialtyWorkspace({
               {/* === REHABILITACION === */}
               {currentSpecialty === "rehabilitacion" && (
                 <div className="space-y-5 animate-fade-in">
-                  <div className="flex items-center gap-3 pb-3 border-b border-slate-150 dark:border-slate-800">
-                    <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-955/20 dark:text-purple-400">
-                      <Sparkles className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-sm text-slate-800 dark:text-white">Reconstrucción Estética y Rehabilitación Oral</h4>
-                      <p className="text-xs text-slate-450 font-normal">Toma de color biométrico de dientes, materiales cerámicos e indicador de oclusión.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800/80 space-y-3.5">
-                      <span className="text-[10px] font-extrabold text-purple-500 uppercase block tracking-wider">Toma de Color del Paciente</span>
-                      
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block">Guía de Color Vita Classical:</label>
-                        <select
-                          value={specData.rehabVitaColor || "A2"}
-                          onChange={(e) => updateSpecData("rehabVitaColor", e.target.value)}
-                          className="w-full text-xs p-2.5 bg-white dark:bg-slate-900 border border-slate-150 rounded-lg font-mono font-bold text-teal-600 dark:text-teal-400"
-                        >
-                          <option value="A1">A1 (Claro)</option>
-                          <option value="A2">A2 (Natural Clínico)</option>
-                          <option value="A3">A3 (Estándar)</option>
-                          <option value="A3.5">A3.5</option>
-                          <option value="A4">A4</option>
-                          <option value="B1">B1 (Blanco brillante)</option>
-                          <option value="B2">B2</option>
-                          <option value="C2">C2</option>
-                          <option value="D2">D2</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block">Restauración Planificada:</label>
-                        <select
-                          value={specData.rehabRestType || "Corona Unitario Disilicato de Litio"}
-                          onChange={(e) => updateSpecData("rehabRestType", e.target.value)}
-                          className="w-full text-xs p-2 bg-white dark:bg-slate-900 border border-slate-150 rounded-lg text-slate-700 dark:text-slate-350"
-                        >
-                          <option value="Corona Unitario Disilicato de Litio">Corona Unitario Disilicato de Litio (CAD-CAM)</option>
-                          <option value="Corona de Circonio Puro">Corona de Circonio Translúcido (Alta resistencia)</option>
-                          <option value="Carilla Estética de Porcelana">Carilla Estética de Porcelana</option>
-                          <option value="Incrustación / Onlay de Composite">Incrustación / Onlay de Composite</option>
-                          <option value="Puente Fijo 3 Unidades">Puente Fijo 3 Unidades</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-800/80 space-y-3 col-span-1">
-                      <span className="text-[10px] font-extrabold text-purple-550 uppercase block tracking-wider">Patologías de Oclusión & Hábitos</span>
-                      
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={specData.rehabBruxism || false}
-                            onChange={(e) => updateSpecData("rehabBruxism", e.target.checked)}
-                            className="rounded text-purple-600 focus:ring-purple-500 w-4.5 h-4.5 cursor-pointer"
-                          />
-                          Presenta Desgaste Oclusal / Bruxismo Crítico
-                        </label>
-
-                        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={specData.rehabArticularSound || false}
-                            onChange={(e) => updateSpecData("rehabArticularSound", e.target.checked)}
-                            className="rounded text-purple-600 focus:ring-purple-500 w-4.5 h-4.5 cursor-pointer"
-                          />
-                          Ruido Articular ATM (Chasquido/Crepitación)
-                        </label>
-                      </div>
-                    </div>
-                  </div>
+                  <RehabSchema2D patient={patient} onUpdatePatient={onUpdatePatient} />
                 </div>
               )}
 
@@ -727,6 +655,15 @@ export default function SpecialtyWorkspace({
           </AnimatePresence>
         </div>
 
+      </div>
+
+      {/* Specialty Tools Suite Component */}
+      <div className="pt-4">
+        <SpecialtyToolsSuite 
+          patient={patient}
+          onUpdatePatient={onUpdatePatient}
+          activeSpecialtyDefault={currentSpecialty}
+        />
       </div>
     </div>
   );

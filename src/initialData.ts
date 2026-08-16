@@ -77,7 +77,20 @@ export function createEmptyAnamnesis(): Anamnesis {
     tabaquismo: 0,
     alergias: "",
     dolorActual: "ninguno",
-    notasSistemicas: ""
+    notasSistemicas: "",
+    anticoagulantes: false,
+    tipoAnticoagulante: "",
+    valorINR: "",
+    bifosfonatos: false,
+    viaBifosfonatos: "ninguno",
+    profilaxisAntibiotica: false,
+    razonProfilaxis: "",
+    presionSistolica: 120,
+    presionDiastolica: 80,
+    alergiaAnestesia: "Ninguna",
+    alergiaLatex: false,
+    embarazo: false,
+    biotipoPeriodontal: "medio"
   };
 }
 
@@ -101,6 +114,10 @@ export const INITIAL_PATIENTS: Patient[] = [
     birthdate: "1983-05-14",
     notes: "Paciente con antecedentes de hipertensión controlada. Refiere sensibilidad en el cuadrante superior derecho.",
     createdAt: "2026-03-10T10:00:00Z",
+    flowStatus: "en_sillon",
+    chairAssigned: "Sillón 1",
+    checkInTime: "15:05",
+    statusUpdatedAt: "15:10",
     odontogram: {
       ...createEmptyOdontogram(),
       16: {
@@ -224,6 +241,9 @@ export const INITIAL_PATIENTS: Patient[] = [
     birthdate: "1994-09-22",
     notes: "Paciente sana de 31 años. Acude por limpieza semestral de rutina. Excelente higiene general, bruxismo leve en las noches.",
     createdAt: "2026-05-18T14:30:00Z",
+    flowStatus: "espera",
+    checkInTime: "16:15",
+    statusUpdatedAt: "16:15",
     odontogram: createEmptyOdontogram(),
     periodontogram: createEmptyPeriodontogram(),
     oLeary: createEmptyOLeary(),
@@ -240,6 +260,7 @@ export const INITIAL_PATIENTS: Patient[] = [
     birthdate: "1965-11-03",
     notes: "Fumador pesado (10 cigarrillos/día). Indica sangrado profuso al cepillarse y movilidad subjetiva.",
     createdAt: "2026-06-01T08:15:00Z",
+    flowStatus: "programado",
     odontogram: {
       ...createEmptyOdontogram(),
       21: {

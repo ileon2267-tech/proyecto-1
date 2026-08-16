@@ -11,10 +11,11 @@ interface OdontogramaProps {
 
 type SelectedTool = "caries" | "obturado" | "sano";
 
-export default function Odontograma({ odontogram, onChange }: OdontogramaProps) {
+function OdontogramaComponent({ odontogram, onChange }: OdontogramaProps) {
   const [activeTool, setActiveTool] = useState<SelectedTool>("caries");
   const [selectedTooth, setSelectedTooth] = useState<number | null>(11);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [archFilter, setArchFilter] = useState<"all" | "upper" | "lower">("all");
 
   const handleSurfaceClick = (toothNum: number, surface: keyof ToothState["surfaces"]) => {
     const updated = { ...odontogram };
@@ -294,16 +295,47 @@ export default function Odontograma({ odontogram, onChange }: OdontogramaProps) 
         </p>
       </div>
 
-      {/* Visual Guide Legend Block */}
-      <div className="bg-slate-50/40 dark:bg-slate-900/40 rounded-xl p-3 border border-slate-105 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 select-none">
-        <span className="text-[9.5px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider">Código de Hallazgos:</span>
-        <div className="flex flex-wrap items-center gap-4 text-[10.5px] font-bold text-slate-550 dark:text-slate-450">
+      {/* Visual Guide Legend Block & Arch Selector */}
+      <div className="bg-slate-50/40 dark:bg-slate-900/40 rounded-xl p-3 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 select-none">
+        <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
+          <button
+            onClick={() => setArchFilter("all")}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              archFilter === "all"
+                ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400"
+            }`}
+          >
+            Ambas Arcadas
+          </button>
+          <button
+            onClick={() => setArchFilter("upper")}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              archFilter === "upper"
+                ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400"
+            }`}
+          >
+            Superior (11-28)
+          </button>
+          <button
+            onClick={() => setArchFilter("lower")}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              archFilter === "lower"
+                ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400"
+            }`}
+          >
+            Inferior (31-48)
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 text-[10.5px] font-bold text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Caries Activa</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Obturado (Resina)</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-slate-100 border border-emerald-500/30" /> Sano</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 text-red-500 font-black text-center text-[12px] leading-none">&#10006;</span> Ausente / Extracción</span>
-          <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded border-2 border-amber-500 bg-white dark:bg-slate-950 inline-block" /> Corona Protésica</span>
-          <span className="flex items-center gap-1.5"><span className="w-1.5 h-3.5 bg-blue-500 inline-block shadow-xs rounded-full" /> Endodoncia</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 text-red-500 font-black text-center text-[12px] leading-none">&#10006;</span> Ausente</span>
+          <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded border-2 border-amber-500 bg-white dark:bg-slate-950 inline-block" /> Corona</span>
           <span className="flex items-center gap-1.5"><span className="px-1 py-0.2 bg-teal-600 text-white font-extrabold text-[8px] rounded uppercase">Imp</span> Implante</span>
         </div>
       </div>
@@ -312,42 +344,46 @@ export default function Odontograma({ odontogram, onChange }: OdontogramaProps) 
       <div className="space-y-6 overflow-x-auto pb-4 pt-2">
         
         {/* Upper Arch */}
-        <div className="space-y-3 min-w-[760px]">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block text-center bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800/40">
-            Arcada Maxilar Superior (Upper FDI Arch)
-          </span>
-          <div className="flex justify-between gap-2 px-1">
-            {/* UPPER RIGHT */}
-            <div className="flex gap-1.5">
-              {UPPER_TEETH.right.map((num) => renderToothSVG(num))}
-            </div>
-            {/* CENTRAL MITROR LINE */}
-            <div className="w-px bg-slate-200 dark:bg-slate-800 self-stretch my-1" />
-            {/* UPPER LEFT */}
-            <div className="flex gap-1.5">
-              {UPPER_TEETH.left.map((num) => renderToothSVG(num))}
+        {(archFilter === "all" || archFilter === "upper") && (
+          <div className="space-y-3 min-w-[760px]">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block text-center bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800/40">
+              Arcada Maxilar Superior (11 - 28)
+            </span>
+            <div className="flex justify-between gap-2 px-1">
+              {/* UPPER RIGHT */}
+              <div className="flex gap-1.5">
+                {UPPER_TEETH.right.map((num) => renderToothSVG(num))}
+              </div>
+              {/* CENTRAL MITROR LINE */}
+              <div className="w-px bg-slate-200 dark:bg-slate-800 self-stretch my-1" />
+              {/* UPPER LEFT */}
+              <div className="flex gap-1.5">
+                {UPPER_TEETH.left.map((num) => renderToothSVG(num))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Lower Arch */}
-        <div className="space-y-3 min-w-[760px] pt-4 border-t border-slate-100 dark:border-slate-800/50">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block text-center bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800/40">
-            Arcada Mandibular Inferior (Lower FDI Arch)
-          </span>
-          <div className="flex justify-between gap-2 px-1">
-            {/* LOWER RIGHT */}
-            <div className="flex gap-1.5">
-              {LOWER_TEETH.right.map((num) => renderToothSVG(num))}
-            </div>
-            {/* CENTRAL MIRROR LINE */}
-            <div className="w-px bg-slate-200 dark:bg-slate-800 self-stretch my-1" />
-            {/* LOWER LEFT */}
-            <div className="flex gap-1.5">
-              {LOWER_TEETH.left.map((num) => renderToothSVG(num))}
+        {(archFilter === "all" || archFilter === "lower") && (
+          <div className="space-y-3 min-w-[760px] pt-4 border-t border-slate-100 dark:border-slate-800/50">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block text-center bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800/40">
+              Arcada Mandibular Inferior (31 - 48)
+            </span>
+            <div className="flex justify-between gap-2 px-1">
+              {/* LOWER RIGHT */}
+              <div className="flex gap-1.5">
+                {LOWER_TEETH.right.map((num) => renderToothSVG(num))}
+              </div>
+              {/* CENTRAL MIRROR LINE */}
+              <div className="w-px bg-slate-200 dark:bg-slate-800 self-stretch my-1" />
+              {/* LOWER LEFT */}
+              <div className="flex gap-1.5">
+                {LOWER_TEETH.left.map((num) => renderToothSVG(num))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
 
@@ -466,3 +502,5 @@ export default function Odontograma({ odontogram, onChange }: OdontogramaProps) 
     </div>
   );
 }
+
+export default React.memo(OdontogramaComponent);

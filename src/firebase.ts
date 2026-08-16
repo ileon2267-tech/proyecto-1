@@ -45,6 +45,23 @@ export interface FirestoreErrorInfo {
   }
 }
 
+export function cleanForFirestore<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForFirestore(item)) as unknown as T;
+  }
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj as Record<string, any>)) {
+    const value = (obj as Record<string, any>)[key];
+    if (value !== undefined) {
+      result[key] = cleanForFirestore(value);
+    }
+  }
+  return result as T;
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),

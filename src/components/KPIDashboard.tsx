@@ -1,80 +1,86 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Patient, Appointment } from "../types";
 import { Users, Calendar, Activity, Droplets, TrendingUp, Sparkles, AlertCircle, ArrowRight, UserCheck, Shield, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
+import { ClinicalFlowTracker } from "./ClinicalFlowTracker";
 
 interface KPIDashboardProps {
   patients: Patient[];
   appointments: Appointment[];
   onNavigateTo: (view: string) => void;
   onSelectPatient: (patientId: string) => void;
+  onUpdatePatient?: (updatedPatient: Patient) => void;
 }
 
-export default function KPIDashboard({
+const ALL_TEETH_LIST = [
+  18, 17, 16, 15, 14, 13, 12, 11,
+  21, 22, 23, 24, 25, 26, 27, 28,
+  48, 47, 46, 45, 44, 43, 42, 41,
+  31, 32, 33, 34, 35, 36, 37, 38
+];
+
+function KPIDashboardComponent({
   patients,
   appointments,
   onNavigateTo,
   onSelectPatient,
+  onUpdatePatient
 }: KPIDashboardProps) {
   const todayStr = "2026-06-07"; // Hardcoded to match PerioDash simulated workspace date
   
-  const todayAppointments = appointments.filter((app) => app.date === todayStr);
-  const confirmedToday = todayAppointments.filter((app) => app.status === "Confirmed").length;
+  const todayAppointments = useMemo(() => appointments.filter((app) => app.date === todayStr), [appointments]);
+  const confirmedToday = useMemo(() => todayAppointments.filter((app) => app.status === "Confirmed").length, [todayAppointments]);
   
   // Calculate clinical statistics for BOP % and Plaque % from patients with active records
-  let totalSurfacesEvaluated = 0;
-  let bleedingSurfacesCount = 0;
-  let plaqueSurfacesCount = 0;
-  let deepPocketsCount = 0; // pockets >= 4mm
+  const { totalSurfacesEvaluated, bleedingSurfacesCount, plaqueSurfacesCount, deepPocketsCount } = useMemo(() => {
+    let total = 0;
+    let bleeding = 0;
+    let plaque = 0;
+    let deep = 0;
 
-  patients.forEach((p) => {
-    const UPPER_TEETH = {
-      right: [18, 17, 16, 15, 14, 13, 12, 11],
-      left: [21, 22, 23, 24, 25, 26, 27, 28]
-    };
-    const LOWER_TEETH = {
-      right: [48, 47, 46, 45, 44, 43, 42, 41],
-      left: [31, 32, 33, 34, 35, 36, 37, 38]
-    };
-    const allTeeth = [...Object.values(UPPER_TEETH).flat(), ...Object.values(LOWER_TEETH).flat()];
+    patients.forEach((p) => {
+      ALL_TEETH_LIST.forEach((toothNumber) => {
+        // Exclude absent teeth correctly
+        if (p.odontogram?.[toothNumber]?.condition === "ausente") return;
 
-    allTeeth.forEach((toothNumber) => {
-      // Exclude absent teeth correctly
-      if (p.odontogram?.[toothNumber]?.condition === "ausente") return;
+        total += 6; // 3 vestibular + 3 palatino
 
-      // Evaluate Vestibular: 3 surfaces (mesial, central, distal)
-      totalSurfacesEvaluated += 3;
-      // Evaluate Palatino/Lingual: 3 surfaces (mesial, central, distal)
-      totalSurfacesEvaluated += 3;
+        const state = p.periodontogram?.[toothNumber];
+        if (state) {
+          if (state.sangradoVestibular?.mesial) bleeding++;
+          if (state.sangradoVestibular?.central) bleeding++;
+          if (state.sangradoVestibular?.distal) bleeding++;
 
-      const state = p.periodontogram?.[toothNumber];
-      if (state) {
-        if (state.sangradoVestibular?.mesial) bleedingSurfacesCount++;
-        if (state.sangradoVestibular?.central) bleedingSurfacesCount++;
-        if (state.sangradoVestibular?.distal) bleedingSurfacesCount++;
+          if (state.placaVestibular?.mesial) plaque++;
+          if (state.placaVestibular?.central) plaque++;
+          if (state.placaVestibular?.distal) plaque++;
 
-        if (state.placaVestibular?.mesial) plaqueSurfacesCount++;
-        if (state.placaVestibular?.central) plaqueSurfacesCount++;
-        if (state.placaVestibular?.distal) plaqueSurfacesCount++;
+          if (state.vestibularPocket?.mesial >= 4) deep++;
+          if (state.vestibularPocket?.central >= 4) deep++;
+          if (state.vestibularPocket?.distal >= 4) deep++;
 
-        if (state.vestibularPocket?.mesial >= 4) deepPocketsCount++;
-        if (state.vestibularPocket?.central >= 4) deepPocketsCount++;
-        if (state.vestibularPocket?.distal >= 4) deepPocketsCount++;
+          if (state.sangradoPalatino?.mesial) bleeding++;
+          if (state.sangradoPalatino?.central) bleeding++;
+          if (state.sangradoPalatino?.distal) bleeding++;
 
-        if (state.sangradoPalatino?.mesial) bleedingSurfacesCount++;
-        if (state.sangradoPalatino?.central) bleedingSurfacesCount++;
-        if (state.sangradoPalatino?.distal) bleedingSurfacesCount++;
+          if (state.placaPalatino?.mesial) plaque++;
+          if (state.placaPalatino?.central) plaque++;
+          if (state.placaPalatino?.distal) plaque++;
 
-        if (state.placaPalatino?.mesial) plaqueSurfacesCount++;
-        if (state.placaPalatino?.central) plaqueSurfacesCount++;
-        if (state.placaPalatino?.distal) plaqueSurfacesCount++;
-
-        if (state.palatinoPocket?.mesial >= 4) deepPocketsCount++;
-        if (state.palatinoPocket?.central >= 4) deepPocketsCount++;
-        if (state.palatinoPocket?.distal >= 4) deepPocketsCount++;
-      }
+          if (state.palatinoPocket?.mesial >= 4) deep++;
+          if (state.palatinoPocket?.central >= 4) deep++;
+          if (state.palatinoPocket?.distal >= 4) deep++;
+        }
+      });
     });
-  });
+
+    return {
+      totalSurfacesEvaluated: total,
+      bleedingSurfacesCount: bleeding,
+      plaqueSurfacesCount: plaque,
+      deepPocketsCount: deep
+    };
+  }, [patients]);
 
   const bopPercentage = totalSurfacesEvaluated > 0 
     ? Math.round((bleedingSurfacesCount / totalSurfacesEvaluated) * 100) 
@@ -180,6 +186,18 @@ export default function KPIDashboard({
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </motion.div>
+
+      {/* Real-time Chair & Waiting Room Flow Tracker (Compact View) */}
+      {onUpdatePatient && (
+        <motion.div variants={itemVariants}>
+          <ClinicalFlowTracker 
+            patients={patients}
+            onUpdatePatient={onUpdatePatient}
+            onSelectPatient={(id) => onSelectPatient(id)}
+            compact={true}
+          />
+        </motion.div>
+      )}
 
       {/* Bento Grid Stats */}
       <motion.div 
@@ -426,3 +444,5 @@ export default function KPIDashboard({
     </div>
   );
 }
+
+export default React.memo(KPIDashboardComponent);

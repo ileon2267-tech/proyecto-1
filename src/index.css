@@ -81,16 +81,89 @@
 
 /* Base style resets */
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #f1f5f9;
+  color: #020617;
   font-family: var(--font-sans);
   letter-spacing: -0.01em;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .dark {
-  background-color: #09090b;
+  background-color: #040814;
   color: #f1f5f9;
+}
+
+/* ==========================================================================
+   LIGHT MODE SHARPNESS & HIGH-CONTRAST ENHANCEMENTS
+   ========================================================================== */
+html:not(.dark) {
+  color-scheme: light;
+}
+
+/* Sharp Card & Panel Boundaries */
+html:not(.dark) .bg-white {
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+}
+
+/* Sharpen light mode borders across faint border classes */
+html:not(.dark) .border-slate-50,
+html:not(.dark) .border-slate-100 {
+  border-color: #cbd5e1;
+}
+
+/* Sharpen muted text contrast in light mode */
+html:not(.dark) .text-slate-400 {
+  color: #475569; /* Slate-600 for sharp secondary text */
+}
+
+html:not(.dark) .text-slate-500 {
+  color: #334155; /* Slate-700 for high legibility */
+}
+
+/* High contrast inputs and form controls in light mode */
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+html:not(.dark) select,
+html:not(.dark) textarea {
+  color: #020617 !important;
+  background-color: #ffffff !important;
+  border-color: #94a3b8 !important; /* Slate-400 crisp border */
+}
+
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.25) !important;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* High contrast tables in light mode */
+html:not(.dark) table thead {
+  background-color: #f8fafc;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+html:not(.dark) table th {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+html:not(.dark) table td {
+  border-color: #e2e8f0;
+}
+
+/* Sharp glass panels in light mode */
+html:not(.dark) .glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04) !important;
 }
 
 /* Custom Scrollbars */

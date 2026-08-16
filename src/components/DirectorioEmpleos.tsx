@@ -323,7 +323,7 @@ export default function DirectorioEmpleos() {
                             <FileText className="w-6 h-6 text-teal-600 dark:text-teal-400" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">CV_{selectedProfile.name.replace(/ /g, '_')}_2024.pdf</h4>
+                            <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">CV_{selectedProfile.name.replace(/ /g, '_')}_2026.pdf</h4>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Subido hace 2 meses • 2.4 MB</p>
                           </div>
                         </div>

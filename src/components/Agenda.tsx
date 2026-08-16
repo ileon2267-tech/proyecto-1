@@ -363,7 +363,7 @@ export default function Agenda({
               <span className="text-2xl font-black text-slate-800 dark:text-white">{occupancyRate}%</span>
               <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-0.5"><TrendingUp className="w-3.5 h-3.5" /> Óptimo</span>
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-450">De {COMMON_HOURS.length * AVAILABLE_BOXES.length} slots disponibles hoy.</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">De {COMMON_HOURS.length * AVAILABLE_BOXES.length} slots disponibles hoy.</p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-500/20 flex items-center justify-center shrink-0">
             <Activity className="w-6 h-6 text-teal-650 dark:text-teal-400" />
@@ -390,7 +390,7 @@ export default function Agenda({
             ) : (
               <>
                 <span className="text-xs font-bold text-slate-400 dark:text-slate-500 block py-1">Sin turnos pendientes</span>
-                <p className="text-[10px] text-slate-450 dark:text-slate-500">Toda la agenda atendida o despejada.</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">Toda la agenda atendida o despejada.</p>
               </>
             )}
           </div>
@@ -412,7 +412,7 @@ export default function Agenda({
               <span className="text-sm font-black text-slate-800 dark:text-white">{busiestBox}</span>
               <span className="text-[9px] font-extrabold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md">{busiestBoxCount} citas</span>
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-450">Sillón con mayor carga clínica de hoy.</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">Sillón con mayor carga clínica de hoy.</p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-500/20 flex items-center justify-center shrink-0">
             <Clock className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -459,7 +459,7 @@ export default function Agenda({
                   setSelectedDate(newDateStr);
                   setFormDate(newDateStr);
                 }}
-                className="p-1.5 rounded-lg text-slate-650 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
                 title="Día anterior"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -486,7 +486,7 @@ export default function Agenda({
                   setSelectedDate(newDateStr);
                   setFormDate(newDateStr);
                 }}
-                className="p-1.5 rounded-lg text-slate-650 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer"
                 title="Día siguiente"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -832,7 +832,7 @@ export default function Agenda({
 
                                         <button
                                           onClick={(e) => { e.stopPropagation(); onDeleteAppointment(matchedApp.id); }}
-                                          className="p-1 text-slate-350 hover:text-red-500 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center rounded-md"
+                                          className="p-1 text-slate-300 hover:text-red-500 transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center rounded-md"
                                           title="Eliminar"
                                         >
                                           <Trash2 className="w-3 h-3" />
@@ -842,7 +842,7 @@ export default function Agenda({
                                   ) : (
                                     <button
                                       onClick={() => handleOpenAddForm(hr, bName)}
-                                      className="w-full h-full opacity-40 hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 rounded-xl border border-dashed border-slate-350 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-slate-700 cursor-pointer text-xs font-semibold"
+                                      className="w-full h-full opacity-40 hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-slate-700 cursor-pointer text-xs font-semibold"
                                     >
                                       + Agendar
                                     </button>
@@ -880,7 +880,7 @@ export default function Agenda({
                 <button
                   type="button"
                   onClick={() => { setShowForm(false); setEditingId(null); }}
-                  className="p-1 px-1.5 text-slate-400 hover:text-slate-650 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border-0 cursor-pointer flex items-center justify-center"
+                  className="p-1 px-1.5 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border-0 cursor-pointer flex items-center justify-center"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -974,7 +974,7 @@ export default function Agenda({
                               ? "bg-teal-500/10 border-teal-500 text-teal-700 dark:text-teal-400 shadow-sm scale-102"
                               : hasConflict
                               ? "bg-red-500/5 border-red-500/20 text-red-650 dark:text-red-400 hover:bg-red-500/10"
-                              : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
+                              : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
                           }`}
                         >
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isSelected ? 'bg-teal-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
@@ -1044,7 +1044,7 @@ export default function Agenda({
                 <button
                   type="button"
                   onClick={() => { setShowForm(false); setEditingId(null); }}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-750 dark:text-slate-400 dark:hover:text-white bg-transparent border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer"
+                  className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white bg-transparent border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer"
                 >
                   Cancelar
                 </button>

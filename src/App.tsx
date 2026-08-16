@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
 import { Patient, Appointment, ClinicalUser } from "./types";
 import { 
   INITIAL_PATIENTS, 
@@ -6,30 +6,61 @@ import {
   createEmptyOdontogram, 
   createEmptyPeriodontogram 
 } from "./initialData";
-import { db, handleFirestoreError, OperationType } from "./firebase";
+import { db, handleFirestoreError, OperationType, auth, cleanForFirestore } from "./firebase";
+import { signInAnonymously } from "firebase/auth";
 import { collection, doc, setDoc, getDocs, deleteDoc, getDocFromServer } from "firebase/firestore";
+
+// Critical First-Paint Components (Eager Load)
 import KPIDashboard from "./components/KPIDashboard";
 import Odontograma from "./components/Odontograma";
 import Periodontograma from "./components/Periodontograma";
-import Agenda from "./components/Agenda";
 import DentitoChat from "./components/DentitoChat";
-import DentalStories from "./components/DentalStories";
 import Spotlight from "./components/Spotlight";
-import FinanceModule from "./components/FinanceModule";
-import PrintReport from "./components/PrintReport";
-import OLearyControl from "./components/OLearyControl";
-import XRayGallery from "./components/XRayGallery";
-import SoapAIAssistant from "./components/SoapAIAssistant";
-import PRARiskAssessment from "./components/PRARiskAssessment";
-import TreatmentPlanModule from "./components/TreatmentPlanModule";
-import SharePatientModal from "./components/SharePatientModal";
-import DirectorioEmpleos from "./components/DirectorioEmpleos";
-import PatientFile from "./components/PatientFile";
 import Logo from "./components/Logo";
 import LoginScreen from "./components/LoginScreen";
-import PatientPortal from "./components/PatientPortal";
-import DentalMarketplace from "./components/DentalMarketplace";
-import SpecialtyWorkspace from "./components/SpecialtyWorkspace";
+import MobileBottomDock from "./components/MobileBottomDock";
+import MobileNavigationDrawer from "./components/MobileNavigationDrawer";
+
+// Secondary & Auxiliary Views (Code-Split / Lazy Load for Ultra-Fast App Startup & Low Memory)
+const Agenda = lazy(() => import("./components/Agenda"));
+const DentalStories = lazy(() => import("./components/DentalStories"));
+const FinanceModule = lazy(() => import("./components/FinanceModule"));
+const PrintReport = lazy(() => import("./components/PrintReport"));
+const OLearyControl = lazy(() => import("./components/OLearyControl"));
+const XRayGallery = lazy(() => import("./components/XRayGallery"));
+const SoapAIAssistant = lazy(() => import("./components/SoapAIAssistant"));
+const PRARiskAssessment = lazy(() => import("./components/PRARiskAssessment"));
+const TreatmentPlanModule = lazy(() => import("./components/TreatmentPlanModule"));
+const SharePatientModal = lazy(() => import("./components/SharePatientModal"));
+const DirectorioEmpleos = lazy(() => import("./components/DirectorioEmpleos"));
+const PatientFile = lazy(() => import("./components/PatientFile"));
+const PatientPortal = lazy(() => import("./components/PatientPortal"));
+const DentalMarketplace = lazy(() => import("./components/DentalMarketplace"));
+const SpecialtyWorkspace = lazy(() => import("./components/SpecialtyWorkspace"));
+const InteractiveHelpPanel = lazy(() => import("./components/InteractiveHelpPanel"));
+const KeyboardShortcutsModal = lazy(() => import("./components/KeyboardShortcutsModal"));
+const PatientDirectory = lazy(() => import("./components/PatientDirectory"));
+const ClinicalFlowTracker = lazy(() => import("./components/ClinicalFlowTracker").then(m => ({ default: m.ClinicalFlowTracker })));
+
+// Ultra-lightweight Clinical Suspense Skeleton
+function ClinicalViewSkeleton() {
+  return (
+    <div className="w-full p-8 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 backdrop-blur-md animate-pulse space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-5 w-48 bg-teal-500/20 rounded-lg" />
+          <div className="h-3 w-72 bg-slate-200 dark:bg-slate-800 rounded-md" />
+        </div>
+        <div className="h-8 w-28 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+        <div className="h-32 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/40 dark:border-slate-700/40" />
+        <div className="h-32 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/40 dark:border-slate-700/40" />
+        <div className="h-32 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/40 dark:border-slate-700/40" />
+      </div>
+    </div>
+  );
+}
 
 
 // Icons from Lucide-React
@@ -50,6 +81,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Printer,
   ClipboardList,
   MessageSquare,
@@ -63,11 +95,12 @@ import {
   Smile,
   TrendingUp,
   HeartPulse,
-  Columns
+  Columns,
+  Menu
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-type ActiveTab = "dashboard" | "clinica" | "agenda" | "finanzas" | "dentalstories" | "reportes" | "pacientes" | "ajustes" | "tienda" | "bolsa-empleo";
+type ActiveTab = "dashboard" | "flujo" | "clinica" | "agenda" | "finanzas" | "dentalstories" | "reportes" | "pacientes" | "ajustes" | "tienda" | "bolsa-empleo";
 
 export default function App() {
   // Session Authentication State
@@ -147,7 +180,8 @@ export default function App() {
 
   // Theme state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    return localStorage.getItem("perioTheme") === "dark";
+    const saved = localStorage.getItem("perioTheme");
+    return saved === null ? true : saved === "dark";
   });
 
   // Client and Clinical records states
@@ -182,6 +216,66 @@ export default function App() {
     return localStorage.getItem("perioZenMode") === "true";
   });
 
+  // Onboarding, Help Panel & Shortcuts Modal States
+  const [learningMode, setLearningMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem("perioLearningMode");
+    return saved === "true"; // defaults to false for new users
+  });
+  const [showHelpPanel, setShowHelpPanel] = useState<boolean>(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
+
+  // Smooth scroll to top when switching main tabs or clinical subviews for fluid UX
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeTab, clinicalSubView]);
+
+  // Global Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowShortcutsModal(false);
+        setShowShareModal(false);
+        setDeletingPatientId(null);
+        setShowHelpPanel(false);
+        setIsMobileDrawerOpen(false);
+        return;
+      }
+
+      // Ignore when typing in input, textarea or contenteditable
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return;
+      }
+
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShowShortcutsModal((prev) => !prev);
+      } else if (e.altKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        setIsZenMode((prev) => !prev);
+      } else if (e.altKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        setShowRegisterForm(true);
+      } else if (e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setActiveTab("clinica");
+        setClinicalSubView("periodontograma");
+      } else if (e.altKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        setActiveTab("clinica");
+        setClinicalSubView("odontograma");
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalShortcuts);
+    return () => window.removeEventListener("keydown", handleGlobalShortcuts);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("perioLearningMode", String(learningMode));
+  }, [learningMode]);
+
   const effectiveSidebarCollapsed = isZenMode ? true : isSidebarCollapsed;
   const effectiveClinicalSidebarCollapsed = isZenMode ? true : isClinicalSidebarCollapsed;
 
@@ -208,12 +302,21 @@ export default function App() {
   // Firebase Sync Loading state
   const [isSyncingFirebase, setIsSyncingFirebase] = useState(true);
   const [firebaseSyncError, setFirebaseSyncError] = useState<string | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   // Keep track of previously synced patients and appointments to do differential synchronization
   const prevPatientsRef = useRef<Patient[]>([]);
   const prevAppointmentsRef = useRef<Appointment[]>([]);
 
+  // Auto-select first patient if activeTab === "clinica" and activePatientId is missing
+  useEffect(() => {
+    if (activeTab === "clinica" && !activePatientId && patients.length > 0) {
+      setActivePatientId(patients[0].id);
+    }
+  }, [activeTab, activePatientId, patients]);
+
   // Navigation scroll ref
+  const [isAlertsCollapsed, setIsAlertsCollapsed] = useState(false);
   const clinicalNavRef = useRef<HTMLDivElement>(null);
   const scrollClinicalNav = (direction: "left" | "right") => {
     if (clinicalNavRef.current) {
@@ -225,8 +328,26 @@ export default function App() {
     }
   };
 
+  // Authenticate with Firebase on startup so that we can read/write to Firestore securely
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.log("Firebase Auth optional initialization: offline fallback active.");
+          setIsAuthReady(true);
+        }
+      } else {
+        setIsAuthReady(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Validate Firestore Connection
   useEffect(() => {
+    if (!isAuthReady) return;
     async function testConnection() {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
@@ -238,10 +359,11 @@ export default function App() {
       }
     }
     testConnection();
-  }, []);
+  }, [isAuthReady]);
 
   // Fetch initial data from Firestore
   useEffect(() => {
+    if (!isAuthReady) return;
     async function loadData() {
       setIsSyncingFirebase(true);
       try {
@@ -269,7 +391,7 @@ export default function App() {
           // SEED FIRST TIME
           console.log("Base de datos vacía, inicializando con pacientes por defecto...");
           for (const patient of INITIAL_PATIENTS) {
-            await setDoc(doc(db, "patients", patient.id), patient);
+            await setDoc(doc(db, "patients", patient.id), cleanForFirestore(patient));
           }
           setPatients(INITIAL_PATIENTS);
           prevPatientsRef.current = INITIAL_PATIENTS;
@@ -282,7 +404,7 @@ export default function App() {
           // SEED FIRST TIME
           console.log("Base de datos de citas vacía, inicializando por defecto...");
           for (const app of INITIAL_APPOINTMENTS) {
-            await setDoc(doc(db, "appointments", app.id), app);
+            await setDoc(doc(db, "appointments", app.id), cleanForFirestore(app));
           }
           setAppointments(INITIAL_APPOINTMENTS);
           prevAppointmentsRef.current = INITIAL_APPOINTMENTS;
@@ -300,87 +422,113 @@ export default function App() {
       }
     }
     loadData();
-  }, []);
+  }, [isAuthReady]);
 
-  // Sync state modifications dynamically
+  // Sync state modifications dynamically with debouncing to prevent UI freeze and Firestore rate limits
   useEffect(() => {
     if (isSyncingFirebase) return;
     
-    // Local storage backup
-    localStorage.setItem("perioPatients", JSON.stringify(patients));
+    // Asynchronously debounced local storage backup (prevents freezing main thread during rapid probing/typing)
+    const localTimer = setTimeout(() => {
+      try {
+        localStorage.setItem("perioPatients", JSON.stringify(patients));
+      } catch (e) {
+        console.warn("Storage quota warning:", e);
+      }
+    }, 350);
 
-    async function syncPatientsToCloud() {
-      const prevList = prevPatientsRef.current;
-      
-      // Update/Create Patient
-      for (const p of patients) {
-        const prevVersion = prevList.find(v => v.id === p.id);
-        if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(p)) {
-          try {
-            await setDoc(doc(db, "patients", p.id), p);
-            console.log(`Durable Cloud Sync: Actualizado paciente ${p.name}`);
-          } catch (err) {
-            console.error(`Error de guardado en la nube para paciente ${p.name}:`, err);
+    const cloudTimer = setTimeout(() => {
+      async function syncPatientsToCloud() {
+        const prevList = prevPatientsRef.current;
+        
+        // Update/Create Patient
+        for (const p of patients) {
+          const prevVersion = prevList.find(v => v.id === p.id);
+          if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(p)) {
+            try {
+              await setDoc(doc(db, "patients", p.id), cleanForFirestore(p));
+              console.log(`Durable Cloud Sync: Actualizado paciente ${p.name}`);
+            } catch (err) {
+              console.error(`Error de guardado en la nube para paciente ${p.name}:`, err);
+            }
           }
         }
-      }
 
-      // Delete Patient
-      for (const prev of prevList) {
-        if (!patients.some(p => p.id === prev.id)) {
-          try {
-            await deleteDoc(doc(db, "patients", prev.id));
-            console.log(`Durable Cloud Sync: Eliminado paciente ${prev.name}`);
-          } catch (err) {
-            console.error(`Error al eliminar paciente ${prev.name} en la nube:`, err);
+        // Delete Patient
+        for (const prev of prevList) {
+          if (!patients.some(p => p.id === prev.id)) {
+            try {
+              await deleteDoc(doc(db, "patients", prev.id));
+              console.log(`Durable Cloud Sync: Eliminado paciente ${prev.name}`);
+            } catch (err) {
+              console.error(`Error al eliminar paciente ${prev.name} en la nube:`, err);
+            }
           }
         }
+
+        prevPatientsRef.current = patients;
       }
 
-      prevPatientsRef.current = patients;
-    }
+      syncPatientsToCloud();
+    }, 2000); // 2-second debounce for Firestore patients sync
 
-    syncPatientsToCloud();
+    return () => {
+      clearTimeout(localTimer);
+      clearTimeout(cloudTimer);
+    };
   }, [patients, isSyncingFirebase]);
 
   useEffect(() => {
     if (isSyncingFirebase) return;
 
-    // Local storage backup
-    localStorage.setItem("perioAppointments", JSON.stringify(appointments));
+    // Asynchronously debounced local storage backup
+    const localTimer = setTimeout(() => {
+      try {
+        localStorage.setItem("perioAppointments", JSON.stringify(appointments));
+      } catch (e) {
+        console.warn("Storage quota warning:", e);
+      }
+    }, 350);
 
-    async function syncAppointmentsToCloud() {
-      const prevList = prevAppointmentsRef.current;
+    const cloudTimer = setTimeout(() => {
+      async function syncAppointmentsToCloud() {
+        const prevList = prevAppointmentsRef.current;
 
-      // Update/Create Appointment
-      for (const app of appointments) {
-        const prevVersion = prevList.find(v => v.id === app.id);
-        if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(app)) {
-          try {
-            await setDoc(doc(db, "appointments", app.id), app);
-            console.log(`Durable Cloud Sync: Actualizada cita ${app.id}`);
-          } catch (err) {
-            console.error(`Error de guardado en la nube para cita ${app.id}:`, err);
+        // Update/Create Appointment
+        for (const app of appointments) {
+          const prevVersion = prevList.find(v => v.id === app.id);
+          if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(app)) {
+            try {
+              await setDoc(doc(db, "appointments", app.id), cleanForFirestore(app));
+              console.log(`Durable Cloud Sync: Actualizada cita ${app.id}`);
+            } catch (err) {
+              console.error(`Error de guardado en la nube para cita ${app.id}:`, err);
+            }
           }
         }
-      }
 
-      // Delete Appointment
-      for (const prev of prevList) {
-        if (!appointments.some(app => app.id === prev.id)) {
-          try {
-            await deleteDoc(doc(db, "appointments", prev.id));
-            console.log(`Durable Cloud Sync: Eliminada cita ${prev.id}`);
-          } catch (err) {
-            console.error(`Error al eliminar cita ${prev.id} en la nube:`, err);
+        // Delete Appointment
+        for (const prev of prevList) {
+          if (!appointments.some(app => app.id === prev.id)) {
+            try {
+              await deleteDoc(doc(db, "appointments", prev.id));
+              console.log(`Durable Cloud Sync: Eliminada cita ${prev.id}`);
+            } catch (err) {
+              console.error(`Error al eliminar cita ${prev.id} en la nube:`, err);
+            }
           }
         }
+
+        prevAppointmentsRef.current = appointments;
       }
 
-      prevAppointmentsRef.current = appointments;
-    }
+      syncAppointmentsToCloud();
+    }, 2000); // 2-second debounce for Firestore appointments sync
 
-    syncAppointmentsToCloud();
+    return () => {
+      clearTimeout(localTimer);
+      clearTimeout(cloudTimer);
+    };
   }, [appointments, isSyncingFirebase]);
 
   useEffect(() => {
@@ -404,8 +552,20 @@ export default function App() {
         }
       }
     };
+    const handleOpenHelpEvent = () => {
+      setShowHelpPanel(true);
+    };
+    const handleToggleLearningEvent = () => {
+      setLearningMode(prev => !prev);
+    };
     window.addEventListener("periodash-navigate", handleNavigateEvent);
-    return () => window.removeEventListener("periodash-navigate", handleNavigateEvent);
+    window.addEventListener("periodash-open-help", handleOpenHelpEvent);
+    window.addEventListener("periodash-toggle-learning", handleToggleLearningEvent);
+    return () => {
+      window.removeEventListener("periodash-navigate", handleNavigateEvent);
+      window.removeEventListener("periodash-open-help", handleOpenHelpEvent);
+      window.removeEventListener("periodash-toggle-learning", handleToggleLearningEvent);
+    };
   }, []);
 
   // Auto Zen Mode for Complex Clinical Views
@@ -421,7 +581,7 @@ export default function App() {
   const activePatient = patients.find((p) => p.id === activePatientId) || null;
 
   // Patient Registration Handlers
-  const handleRegisterPatient = (e: React.FormEvent) => {
+  const handleRegisterPatient = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!newPatientName.trim()) return;
 
@@ -435,7 +595,7 @@ export default function App() {
             email: newPatientEmail,
             birthdate: newPatientBirthdate || p.birthdate,
             notes: newPatientNotes,
-          }
+          };
         }
         return p;
       }));
@@ -480,9 +640,9 @@ export default function App() {
     setNewPatientNotes("");
     setEditingPatientId(null);
     setShowRegisterForm(false);
-  };
+  }, [newPatientName, editingPatientId, newPatientPhone, newPatientEmail, newPatientBirthdate, newPatientNotes]);
 
-  const startEditPatient = (p: Patient) => {
+  const startEditPatient = useCallback((p: Patient) => {
     setEditingPatientId(p.id);
     setNewPatientName(p.name);
     setNewPatientPhone(p.phone);
@@ -490,569 +650,428 @@ export default function App() {
     setNewPatientBirthdate(p.birthdate);
     setNewPatientNotes(p.notes);
     setShowRegisterForm(true);
-  };
+  }, []);
 
-  const handleDeletePatient = (patientId: string) => {
+  const handleDeletePatient = useCallback((patientId: string) => {
     setDeletingPatientId(patientId);
-  };
+  }, []);
 
-  const executeDeletePatient = (patientId: string) => {
+  const executeDeletePatient = useCallback((patientId: string) => {
     setPatients((prev) => prev.filter((p) => p.id !== patientId));
     setAppointments((prev) => prev.filter((app) => app.patientId !== patientId));
-    if (activePatientId === patientId) {
-      setActivePatientId("");
-    }
+    setActivePatientId((prev) => (prev === patientId ? "" : prev));
     setDeletingPatientId(null);
-  };
+  }, []);
 
   // Appointment operations 
-  const handleAddAppointment = (newApp: Appointment) => {
+  const handleAddAppointment = useCallback((newApp: Appointment) => {
     setAppointments((prev) => [newApp, ...prev]);
-  };
+  }, []);
 
-  const handleUpdateAppointmentStatus = (id: string, status: Appointment["status"]) => {
+  const handleUpdateAppointmentStatus = useCallback((id: string, status: Appointment["status"]) => {
     setAppointments((prev) => 
       prev.map((app) => (app.id === id ? { ...app, status } : app))
     );
-  };
+  }, []);
 
-  const handleUpdateAppointment = (updatedApp: Appointment) => {
+  const handleUpdateAppointment = useCallback((updatedApp: Appointment) => {
     setAppointments((prev) => 
       prev.map((app) => (app.id === updatedApp.id ? updatedApp : app))
     );
-  };
+  }, []);
 
-  const handleDeleteAppointment = (id: string) => {
+  const handleDeleteAppointment = useCallback((id: string) => {
     setAppointments((prev) => prev.filter((app) => app.id !== id));
-  };
+  }, []);
 
   // Clinical updates 
-  const handleUpdateOdontogram = (updatedOdo: Record<number, any>) => {
+  const handleUpdateOdontogram = useCallback((updatedOdo: Record<number, any>) => {
     if (!activePatientId) return;
     setPatients((prev) => 
       prev.map((p) => (p.id === activePatientId ? { ...p, odontogram: updatedOdo } : p))
     );
-  };
+  }, [activePatientId]);
 
-  const handleUpdatePeriodontogram = (updatedPerio: Record<number, any>) => {
+  const handleUpdatePeriodontogram = useCallback((updatedPerio: Record<number, any>) => {
     if (!activePatientId) return;
     setPatients((prev) => 
       prev.map((p) => (p.id === activePatientId ? { ...p, periodontogram: updatedPerio } : p))
     );
-  };
+  }, [activePatientId]);
 
   const renderWorkspace = () => {
     return (
       <div className="space-y-6 animate-fade-in" id="clinical-area">
-            {/* Active Patient Bar */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-4 sm:p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 bg-teal-50 dark:bg-teal-800 text-teal-600 dark:text-teal-450 rounded-2xl flex items-center justify-center font-display font-extrabold text-xl shadow-xs border border-teal-100 dark:border-teal-900/40 flex-shrink-0">
-                  {activePatient ? activePatient.name.charAt(0) : "?"}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-display font-bold text-slate-900 dark:text-white leading-tight truncate">
-                      {activePatient ? activePatient.name : "Seleccionar Paciente"}
-                    </h2>
-                    {activePatient && (
-                      <div className="flex flex-wrap gap-1">
+            {/* Active Patient Bar (Compact & Responsive) */}
+            {isZenMode ? (
+              /* Ultra-compact 1-line bar for Zen Mode / Full Screen */
+              <div className="bg-slate-900/90 text-white backdrop-blur-md rounded-xl border border-teal-500/30 p-2 sm:px-4 sm:py-2 flex items-center justify-between gap-2 shadow-md text-xs select-none">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="font-bold text-white truncate font-display">
+                    {activePatient ? activePatient.name : "Sin Paciente"}
+                  </span>
+                  {activePatient && (
+                    <>
+                      <span className="text-[10px] text-teal-300 font-medium hidden sm:inline">
+                        Exp. #{activePatient.id} • 🎂 {activePatient.birthdate}
+                      </span>
+                      <div className="hidden md:flex items-center gap-1">
                         {activePatient.anamnesis.hta && (
-                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-600 dark:text-rose-405 rounded-md border border-rose-500/20 shadow-xs" title="Hipertensión Arterial Activa">HTA</span>
+                          <span className="px-1.5 py-0.2 text-[8px] font-black uppercase bg-rose-500/20 text-rose-300 rounded border border-rose-500/30">HTA</span>
                         )}
                         {activePatient.anamnesis.diabetes && (
-                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-650 dark:text-amber-400 rounded-md border border-amber-500/20 shadow-xs" title="Diabetes Mellitus">DBT</span>
-                        )}
-                        {activePatient.anamnesis.tabaquismo > 0 && (
-                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-650 dark:text-slate-305 rounded-md border border-slate-500/20 shadow-xs" title={`Tabaquismo: ${activePatient.anamnesis.tabaquismo} cigarrillos por día`}>TBQ</span>
-                        )}
-                        {activePatient.anamnesis.alergias && (
-                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-yellow-500/10 text-yellow-750 dark:text-yellow-400 rounded-md border border-yellow-500/20 shadow-xs max-w-[80px] truncate" title={`Alergias: ${activePatient.anamnesis.alergias}`}>ALG</span>
-                        )}
-                        {isZenMode && (
-                          <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-white rounded-md border border-emerald-500/20 shadow-sm animate-pulse">Zen</span>
+                          <span className="px-1.5 py-0.2 text-[8px] font-black uppercase bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">DBT</span>
                         )}
                       </div>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1 font-normal">
-                    {activePatient ? (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="inline-flex items-center gap-1">✉️ <span className="truncate max-w-[120px] sm:max-w-none">{activePatient.email}</span></span>
-                        <span className="text-slate-300 dark:text-slate-850">|</span>
-                        <span>📞 {activePatient.phone}</span>
-                        <span className="hidden sm:inline text-slate-300 dark:text-slate-850">|</span>
-                        <span className="hidden sm:inline">🎂 {activePatient.birthdate}</span>
-                      </div>
-                    ) : (
-                      "Sincroniza un expediente clínico existente..."
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
-              </div>
 
-              {/* Patient selections dropdown */}
-              <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
-                <button
-                  onClick={() => setActivePatientId("")}
-                  className="px-3 py-2 sm:px-3.5 sm:py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center cursor-pointer shadow-sm"
-                >
-                  <span>Volver</span>
-                  <span className="hidden sm:inline">&nbsp;al Directorio</span>
-                </button>
-                <select
-                  value={activePatientId}
-                  onChange={(e) => setActivePatientId(e.target.value)}
-                  className="flex-1 lg:flex-initial lg:w-56 text-xs p-2 sm:p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80 rounded-xl text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500/25 outline-none"
-                >
-                  <option value="">Buscar expediente...</option>
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2 shrink-0">
+                  <select
+                    value={clinicalSubView}
+                    onChange={(e) => setClinicalSubView(e.target.value as any)}
+                    className="text-[11px] py-1 px-2 bg-teal-950/90 border border-teal-500/40 rounded-lg text-teal-300 font-bold outline-none cursor-pointer max-w-[130px] sm:max-w-none"
+                    title="Estación Clínica Activa"
+                  >
+                    <option value="ficha">Ficha & Anamnesis</option>
+                    <option value="especialidad">Especialidades</option>
+                    <option value="odontograma">Odontograma</option>
+                    <option value="periodontograma">Periodontograma</option>
+                    <option value="pra">Riesgo PRA</option>
+                    <option value="oleary">Índice O'Leary</option>
+                    <option value="xrays">Tomografías</option>
+                    <option value="soap">SOAP AI</option>
+                    <option value="presupuesto">Presupuestos</option>
+                  </select>
 
-                <button
-                  onClick={() => {
-                    const nextZen = !isZenMode;
-                    setIsZenMode(nextZen);
-                    localStorage.setItem("perioZenMode", String(nextZen));
-                    if (nextZen) {
-                      setIsSidebarCollapsed(true);
-                      setIsClinicalSidebarCollapsed(true);
-                    } else {
+                  <select
+                    value={activePatientId}
+                    onChange={(e) => setActivePatientId(e.target.value)}
+                    className="text-[11px] py-1 px-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 font-medium outline-none cursor-pointer max-w-[130px] sm:max-w-none"
+                  >
+                    <option value="">Buscar expediente...</option>
+                    {patients.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => {
+                      setIsZenMode(false);
+                      localStorage.setItem("perioZenMode", "false");
                       setIsSidebarCollapsed(false);
                       setIsClinicalSidebarCollapsed(false);
-                    }
-                  }}
-                  className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                    isZenMode
-                      ? "bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-550/30 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-950/10"
-                      : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/85 text-slate-700 dark:text-slate-300 border-transparent"
-                  }`}
-                  title={isZenMode ? "Desactivar Modo Zen (Espacio Normal)" : "Activar Modo Zen (Espacio Completo)"}
-                >
-                  <Columns className={`w-4 h-4 transition-transform duration-300 ${isZenMode ? "rotate-90 text-emerald-500" : "text-slate-400"}`} />
-                  <span>{isZenMode ? "Modo Zen" : "Espacio Ampliado"}</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab("reportes")}
-                  className="p-2 sm:p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/65 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800/60 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-bold"
-                  title="Configurar y Generar Reporte A4"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span className="hidden xs:inline">Reporte A4</span>
-                  <span className="xs:hidden">A4</span>
-                </button>
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="px-2.5 py-2 sm:px-3.5 sm:py-2.5 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-600 dark:text-teal-400 font-extrabold text-xs rounded-xl border border-teal-500/40 dark:border-teal-400/50 shadow-[0_0_12px_rgba(20,184,166,0.22)] hover:shadow-[0_0_18px_rgba(20,184,166,0.38)] hover:scale-[1.01] transition-all flex items-center gap-2 cursor-pointer"
-                  title="Generar Enlace Seguro"
-                >
-                  <Share2 className="w-4 h-4 text-teal-500 animate-pulse" />
-                  <span className="hidden xs:inline">Paciente</span>
-                  <span className="xs:hidden">Compartir</span>
-                </button>
+                    }}
+                    className="px-2.5 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 rounded-lg border border-teal-500/40 text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                    title="Salir del Modo Zen / Pantalla Completa"
+                  >
+                    <Columns className="w-3.5 h-3.5 rotate-90 text-teal-400" />
+                    <span className="hidden sm:inline">Salir Zen</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Sleek Compact Horizontal Bar for Standard Mode */
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-3 sm:px-4 sm:py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center font-display font-bold text-base shadow-xs border border-teal-100 dark:border-teal-900/40 shrink-0">
+                    {activePatient ? activePatient.name.charAt(0) : "?"}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-sm sm:text-base font-display font-bold text-slate-900 dark:text-white leading-tight truncate">
+                        {activePatient ? activePatient.name : "Seleccionar Paciente"}
+                      </h2>
+                      {activePatient && (
+                        <div className="flex items-center gap-1">
+                          {activePatient.anamnesis.hta && (
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded border border-rose-500/20" title="Hipertensión Arterial">HTA</span>
+                          )}
+                          {activePatient.anamnesis.diabetes && (
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded border border-amber-500/20" title="Diabetes Mellitus">DBT</span>
+                          )}
+                          {activePatient.anamnesis.tabaquismo > 0 && (
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase bg-slate-500/10 text-slate-600 dark:text-slate-300 rounded border border-slate-500/20" title={`Tabaquismo: ${activePatient.anamnesis.tabaquismo} cig/día`}>TBQ</span>
+                          )}
+                          {activePatient.anamnesis.alergias && (
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-black uppercase bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded border border-yellow-500/20 max-w-[80px] truncate" title={`Alergias: ${activePatient.anamnesis.alergias}`}>ALG</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 font-normal truncate">
+                      {activePatient ? (
+                        <span>Exp. #{activePatient.id} • 📞 {activePatient.phone} • 🎂 {activePatient.birthdate}</span>
+                      ) : (
+                        "Selecciona un expediente para comenzar la sesión clínica"
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Patient Selections & Quick Actions */}
+                <div className="flex flex-wrap gap-2 items-center w-full md:w-auto justify-end">
+                  <select
+                    value={activePatientId}
+                    onChange={(e) => setActivePatientId(e.target.value)}
+                    className="flex-1 md:flex-initial text-xs py-1.5 px-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500/25 outline-none cursor-pointer"
+                  >
+                    <option value="">Buscar expediente...</option>
+                    {patients.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => {
+                      const nextZen = !isZenMode;
+                      setIsZenMode(nextZen);
+                      localStorage.setItem("perioZenMode", String(nextZen));
+                      if (nextZen) {
+                        setIsSidebarCollapsed(true);
+                        setIsClinicalSidebarCollapsed(true);
+                      } else {
+                        setIsSidebarCollapsed(false);
+                        setIsClinicalSidebarCollapsed(false);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                      isZenMode
+                        ? "bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/85 text-slate-700 dark:text-slate-300 border-transparent"
+                    }`}
+                    title={isZenMode ? "Desactivar Modo Zen" : "Activar Modo Zen (Espacio Completo)"}
+                  >
+                    <Columns className={`w-3.5 h-3.5 transition-transform duration-300 ${isZenMode ? "rotate-90 text-emerald-500" : "text-slate-400"}`} />
+                    <span>{isZenMode ? "Modo Zen" : "Pantalla Completa"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab("reportes")}
+                    className="p-1.5 sm:px-2.5 sm:py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/65 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800/60 transition-all cursor-pointer shadow-xs flex items-center gap-1.5 text-xs font-bold"
+                    title="Configurar y Generar Reporte A4"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">Reporte A4</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="px-2.5 py-1.5 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-600 dark:text-teal-400 font-extrabold text-xs rounded-xl border border-teal-500/40 dark:border-teal-400/50 transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Generar Enlace Seguro"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-teal-500" />
+                    <span className="hidden xs:inline">Compartir</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {activePatient ? (
-              <div className="space-y-6 font-display">
+              <div className="space-y-4 font-display">
                 
                 {/* Clinical Alerts and Systemic Highlights Strip */}
                 {!isZenMode && (
-                  <div className="bg-slate-50/80 dark:bg-slate-900/65 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs select-none">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-teal-500/10 rounded-xl border border-teal-500/20">
-                        <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-450" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-none">Radar de Alertas Sistémicas</h4>
-                        <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-bold mt-1">Estado clínico actual relevante para cirugías y sondajes periodontales.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {/* HTA Alert */}
-                      {activePatient.anamnesis.hta && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-red-500/10 text-red-650 dark:text-red-400 rounded-full border border-red-500/20 shadow-xs animate-pulse">
-                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                          HTA Activa
-                        </span>
-                      )}
-
-                      {/* Diabetes Alert */}
-                      {activePatient.anamnesis.diabetes ? (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold rounded-full border shadow-xs ${
-                          activePatient.anamnesis.diabetesStatus === 'severe'
-                            ? "bg-rose-500/10 text-rose-650 dark:text-rose-455 border-rose-500/20 animate-pulse"
-                            : "bg-amber-500/10 text-amber-650 dark:text-amber-400 border-amber-500/20"
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${activePatient.anamnesis.diabetesStatus === 'severe' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                          Diabetes {activePatient.anamnesis.diabetesStatus === 'severe' ? 'Descompensada' : 'Controlada'}
-                        </span>
-                      ) : null}
-
-                      {/* Smoking Alert */}
-                      {activePatient.anamnesis.tabaquismo > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-slate-500/10 text-slate-650 dark:text-slate-300 rounded-full border border-slate-500/20">
-                          🚬 {activePatient.anamnesis.tabaquismo} cig./día
-                        </span>
-                      ) : null}
-
-                      {/* Allergies Alert */}
-                      {activePatient.anamnesis.alergias ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-yellow-500/10 text-yellow-750 dark:text-yellow-400 rounded-full border border-yellow-500/20 max-w-[200px]" title={activePatient.anamnesis.alergias}>
-                          ⚠️ Alergias: {activePatient.anamnesis.alergias}
-                        </span>
-                      ) : null}
-
-                      {/* Current Pain Alert */}
-                      {activePatient.anamnesis.dolorActual && activePatient.anamnesis.dolorActual !== "ninguno" && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-orange-500/10 text-orange-655 dark:text-orange-400 rounded-full border border-orange-500/20">
-                          🔥 Dolor: {activePatient.anamnesis.dolorActual.toUpperCase()}
-                        </span>
-                      )}
-
-                      {/* Safe State indicator fallback */}
-                      {!activePatient.anamnesis.hta && !activePatient.anamnesis.diabetes && activePatient.anamnesis.tabaquismo === 0 && !activePatient.anamnesis.alergias && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-extrabold bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 rounded-full border border-emerald-500/20 shadow-xs">
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                          Sistémicamente Sano
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Responsive Clinical Layout Container */}
-                <div className={`grid grid-cols-1 ${effectiveClinicalSidebarCollapsed ? "lg:grid-cols-1" : "lg:grid-cols-[280px_1fr]"} gap-6 items-start transition-all duration-300`}>
-                  
-                  {/* SIDEBAR NAVIGATION CONTROL PANEL */}
-                  <div className={`space-y-4 ${effectiveClinicalSidebarCollapsed ? "lg:hidden" : ""}`}>
-                    
-                    {/* Desktop Sidebar Control Panel */}
-                    <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-4">
-                      <div className="pb-3 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
+                  <div className="bg-slate-50/90 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-3.5 transition-all shadow-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-teal-500/10 rounded-xl border border-teal-500/20">
+                          <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                        </div>
                         <div>
-                          <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                            Ficha Clínica
-                          </h3>
-                          <p className="text-[11px] text-slate-605 dark:text-slate-400 font-bold mt-0.5">
-                            Estaciones de Trabajo
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200 leading-none">Radar de Alertas Sistémicas</h4>
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                              {activePatient.name}
+                            </span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium mt-1 hidden sm:block">
+                            Condiciones sistémicas y alertas de riesgo directo para procedimientos odontológicos.
                           </p>
                         </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          {/* HTA Alert */}
+                          {activePatient.anamnesis.hta && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold bg-red-500/10 text-red-600 dark:text-red-400 rounded-full border border-red-500/20 shadow-xs animate-pulse">
+                              <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                              HTA Activa
+                            </span>
+                          )}
+
+                          {/* Diabetes Alert */}
+                          {activePatient.anamnesis.diabetes ? (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border shadow-xs ${
+                              activePatient.anamnesis.diabetesStatus === 'severe'
+                                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 animate-pulse"
+                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${activePatient.anamnesis.diabetesStatus === 'severe' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                              Diabetes {activePatient.anamnesis.diabetesStatus === 'severe' ? 'Descompensada' : 'Controlada'}
+                            </span>
+                          ) : null}
+
+                          {/* Smoking Alert */}
+                          {activePatient.anamnesis.tabaquismo > 0 ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold bg-slate-500/10 text-slate-600 dark:text-slate-300 rounded-full border border-slate-500/20">
+                              🚬 {activePatient.anamnesis.tabaquismo} cig./día
+                            </span>
+                          ) : null}
+
+                          {/* Safe State indicator fallback */}
+                          {!activePatient.anamnesis.hta && !activePatient.anamnesis.diabetes && activePatient.anamnesis.tabaquismo === 0 && !activePatient.anamnesis.alergias && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/20 shadow-xs">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                              Sistémicamente Sano
+                            </span>
+                          )}
+                        </div>
+
                         <button
-                          onClick={toggleClinicalSidebar}
-                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700/60 transition-all cursor-pointer flex items-center justify-center"
-                          title="Contraer panel de estaciones"
+                          onClick={() => setIsAlertsCollapsed(!isAlertsCollapsed)}
+                          className="p-1.5 hover:bg-slate-200/60 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all cursor-pointer"
+                          title={isAlertsCollapsed ? "Expandir detalles de alertas" : "Plegar radar de alertas"}
                         >
-                          <ChevronLeft className="w-4 h-4 text-slate-500 dark:text-slate-450" />
+                          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAlertsCollapsed ? "rotate-180" : ""}`} />
                         </button>
                       </div>
-                      
-                      <div className="space-y-4">
-                        {[
-                          {
-                            id: "administracion",
-                            label: "Administrativo",
-                            icon: User,
-                            colorClass: "text-blue-600 dark:text-blue-400",
-                            items: [
-                              { id: "ficha", label: "Ficha Médica (Anamnesis)" }
-                            ]
-                          },
-                          {
-                            id: "evaluacion",
-                            label: "Ficha & Diagnóstico",
-                            icon: Stethoscope,
-                            colorClass: "text-teal-600 dark:text-teal-400",
-                            items: [
-                              { id: "especialidad", label: "Consola Especialidades", actsSpec: true },
-                              { id: "odontograma", label: "Odontograma Gráfico" },
-                              { id: "xrays", label: "Tomografías Digitales" },
-                            ]
-                          },
-                          {
-                            id: "periodoncia",
-                            label: "Salud Periodontal",
-                            icon: Activity,
-                            colorClass: "text-emerald-605 dark:text-emerald-400",
-                            items: [
-                              { id: "periodontograma", label: "Periodontograma Clínico" },
-                              { id: "pra", label: "Análisis de Riesgo PRA" },
-                              { id: "oleary", label: "Resumen O'Leary" },
-                            ]
-                          },
-                          {
-                            id: "gestion",
-                            label: "Evolución & Planes",
-                            icon: Sparkles,
-                            colorClass: "text-indigo-600 dark:text-indigo-400",
-                            items: [
-                              { id: "soap", label: "Redactor SOAP (AI)" },
-                              { id: "presupuesto", label: "Presupuestos & Planes" },
-                            ]
-                          }
-                        ].map(cat => {
-                          const Icon = cat.icon;
-                          const isCatActive = [
-                            {
-                              id: "administracion",
-                              items: ["ficha"]
-                            },
-                            {
-                              id: "evaluacion",
-                              items: ["especialidad", "odontograma", "xrays"]
-                            },
-                            {
-                              id: "periodoncia",
-                              items: ["periodontograma", "pra", "oleary"]
-                            },
-                            {
-                              id: "gestion",
-                              items: ["soap", "presupuesto"]
-                            }
-                          ].find(c => c.id === cat.id)?.items.includes(clinicalSubView);
-                          
-                          return (
-                            <div key={cat.id} className="space-y-1.5">
-                              <div className={`flex items-center gap-2 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
-                                isCatActive ? cat.colorClass : "text-slate-400 dark:text-slate-500"
-                              }`}>
-                                <Icon className="w-3.5 h-3.5" />
-                                <span>{cat.label}</span>
-                              </div>
-                              
-                              <div className="space-y-0.5">
-                                {cat.items.map(item => {
-                                  const isItemActive = clinicalSubView === item.id;
-                                  return (
-                                    <button
-                                      key={item.id}
-                                      onClick={() => setClinicalSubView(item.id as any)}
-                                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 flex items-center justify-between group cursor-pointer border ${
-                                        isItemActive
-                                          ? "bg-slate-50/80 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-teal-600 dark:text-teal-400 shadow-xs"
-                                          : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 border-transparent"
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2 max-w-[85%]">
-                                        <span className="truncate">{item.label}</span>
-                                        {item.actsSpec && activePatient && (activePatient as any).activeSpecialty && (
-                                          <span className="text-[8px] uppercase px-1 py-0.2 rounded bg-teal-500/10 text-teal-650 dark:text-teal-400 font-mono font-black border border-teal-500/10">
-                                            {((activePatient as any).activeSpecialty || "perio").slice(0, 3)}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-150 flex-shrink-0 ${
-                                        isItemActive 
-                                          ? "text-teal-600 dark:text-teal-400 translate-x-0.5" 
-                                          : "text-slate-300 dark:text-slate-700/80 group-hover:text-slate-450 group-hover:translate-x-0.5"
-                                      }`} />
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
                     </div>
-                    
-                    {/* Mobile Category & Responsive sub-views Selector */}
-                    <div className="block lg:hidden space-y-3.5">
-                      {/* Responsive Core Segments */}
-                      <div className="grid grid-cols-4 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-800">
-                        {[
-                          { id: "administracion", label: "Ficha", icon: User, defaultItem: "ficha" },
-                          { id: "evaluacion", label: "Diagnóstico", icon: Stethoscope, defaultItem: "especialidad" },
-                          { id: "periodoncia", label: "Periodoncia", icon: Activity, defaultItem: "periodontograma" },
-                          { id: "gestion", label: "Copiloto & Planes", icon: Sparkles, defaultItem: "soap" }
-                        ].map(cat => {
-                          const Icon = cat.icon;
-                          const itemsOfCat = cat.id === "administracion"
-                            ? ["ficha"]
-                            : cat.id === "evaluacion" 
-                            ? ["especialidad", "odontograma", "xrays"] 
-                            : cat.id === "periodoncia" 
-                            ? ["periodontograma", "pra", "oleary"] 
-                            : ["soap", "presupuesto"];
-                          
-                          const isActive = itemsOfCat.includes(clinicalSubView);
-                          
-                          return (
-                            <button
-                              key={cat.id}
-                              onClick={() => setClinicalSubView(cat.defaultItem as any)}
-                              className={`py-2 px-1 rounded-xl text-[10px] font-black tracking-wide transition-all flex flex-col items-center justify-center gap-1 cursor-pointer border ${
-                                isActive
-                                  ? "bg-white dark:bg-slate-900 border-slate-200/50 dark:border-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
-                                  : "text-slate-550 dark:text-slate-400 hover:text-slate-800 border-transparent"
-                              }`}
-                            >
-                              <Icon className="w-4 h-4 flex-shrink-0" />
-                              <span className="truncate">{cat.label.split(" ")[0]}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      
-                      {/* Second tier pills filtered by Category */}
-                      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pb-1">
-                        {[
-                          {
-                            id: "administracion",
-                            items: [
-                              { id: "ficha", label: "Ficha & Anamnesis" }
-                            ]
-                          },
-                          {
-                            id: "evaluacion",
-                            items: [
-                              { id: "especialidad", label: "Especialidades" },
-                              { id: "odontograma", label: "Odontograma" },
-                              { id: "xrays", label: "Tomografías" },
-                            ]
-                          },
-                          {
-                            id: "periodoncia",
-                            items: [
-                              { id: "periodontograma", label: "Periodontograma" },
-                              { id: "pra", label: "Riesgo PRA" },
-                              { id: "oleary", label: "O'Leary" },
-                            ]
-                          },
-                          {
-                            id: "gestion",
-                            items: [
-                              { id: "soap", label: "Redactor SOAP AI" },
-                              { id: "presupuesto", label: "Presupuestos" },
-                            ]
-                          }
-                        ].find(c => {
-                          const activeCategoryString = clinicalSubView === "ficha"
-                            ? "administracion"
-                            : ["especialidad", "odontograma", "xrays"].includes(clinicalSubView)
-                            ? "evaluacion"
-                            : ["periodontograma", "pra", "oleary"].includes(clinicalSubView)
-                            ? "periodoncia"
-                            : "gestion";
-                          return c.id === activeCategoryString;
-                        })?.items.map(item => {
-                          const isItemActive = clinicalSubView === item.id;
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => setClinicalSubView(item.id as any)}
-                              className={`py-1.5 px-4 rounded-full text-[11px] font-bold whitespace-nowrap border transition-all cursor-pointer ${
-                                isItemActive
-                                  ? "bg-teal-600 border-teal-600 text-white shadow-xs"
-                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/45"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    
-                    {/* Ambient info bar inside left side on Desktop */}
-                    {activePatient && (
-                      <div className="hidden lg:block bg-gradient-to-br from-slate-50/80 to-slate-100/40 dark:from-slate-900/45 dark:to-slate-950/20 border border-slate-200/50 dark:border-slate-800/55 p-4 rounded-2xl space-y-2.5">
-                        <span className="text-[9px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase block">Resumen Diagnóstico</span>
-                        <div className="space-y-1">
-                          <p className="text-xs font-extrabold text-slate-850 dark:text-slate-350">{activePatient.name}</p>
-                          <p className="text-[10px] text-slate-450 font-medium">Bolsas calculadas: {
-                            Object.values(activePatient.periodontogram || {}).reduce((acc, currentTooth: any) => {
-                              let pockets = 0;
-                              if (currentTooth) {
-                                const pts = ["pv1", "pv2", "pv3", "pl1", "pl2", "pl3"];
-                                pts.forEach(pt => {
-                                  if (currentTooth[pt] >= 4) pockets++;
-                                });
-                              }
-                              return acc + pockets;
-                            }, 0)
-                          } localizaciones</p>
+
+                    {!isAlertsCollapsed && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                        <div className="bg-white/60 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Alergias Conocidas</span>
+                          <p className="font-bold text-slate-700 dark:text-slate-200 mt-0.5">
+                            {activePatient.anamnesis.alergias || "Sin alergias declaradas"}
+                          </p>
                         </div>
-                        <div className="pt-2 border-t border-slate-200/40 dark:border-slate-800/40 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                          <span className="font-bold">Especialidad activa:</span>
-                          <span className="font-black text-teal-600 dark:text-teal-400 uppercase">
-                            {(activePatient as any).activeSpecialty || "periodoncia"}
+                        <div className="bg-white/60 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Dolor & Sintomatología</span>
+                          <p className="font-bold text-slate-700 dark:text-slate-200 mt-0.5 capitalize">
+                            {activePatient.anamnesis.dolorActual && activePatient.anamnesis.dolorActual !== "ninguno"
+                              ? `Nivel ${activePatient.anamnesis.dolorActual}`
+                              : "Sin sintomatología dolorosa aguda"}
+                          </p>
+                        </div>
+                        <div className="bg-white/60 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Especialidad Activa</span>
+                            <p className="font-black text-teal-600 dark:text-teal-400 uppercase mt-0.5">
+                              {(activePatient as any).activeSpecialty || "Periodoncia"}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold bg-teal-500/10 text-teal-600 dark:text-teal-400 px-2 py-1 rounded-lg">
+                            FDI 11-48
                           </span>
                         </div>
                       </div>
                     )}
                   </div>
-                  
-                  {/* CENTRAL ACTIVE WORKSPACE COMPONENT PANEL */}
-                  <div className="min-w-0 bg-white/40 dark:bg-slate-900/5 rounded-2xl flex flex-col gap-5">
-                    {/* Estaciones Clínicas - Selector de Acceso Directo Horizontal Rápido */}
-                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/80 p-1.5 rounded-2xl flex items-center gap-1 shadow-xs">
-                      <button 
-                        onClick={() => scrollClinicalNav('left')}
-                        className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors shrink-0 cursor-pointer hidden sm:flex"
-                        title="Desplazar a la izquierda"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <div 
-                        ref={clinicalNavRef}
-                        className="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 shrink-0 select-none scroll-smooth px-1"
-                      >
-                        {/* Alternador de Menú Lateral para Desktop */}
-                        <button
-                          onClick={toggleClinicalSidebar}
-                          className={`hidden lg:flex px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-all duration-200 items-center gap-2 cursor-pointer border shrink-0 ${
-                            !effectiveClinicalSidebarCollapsed
-                              ? "bg-slate-50/60 hover:bg-slate-100/80 dark:bg-slate-800/20 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400"
-                              : "bg-teal-500/10 hover:bg-teal-500/20 border-teal-500/20 text-teal-655 dark:text-teal-400 font-extrabold"
-                          }`}
-                          title={effectiveClinicalSidebarCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
-                        >
-                          <Columns className={`w-3.5 h-3.5 ${effectiveClinicalSidebarCollapsed ? "text-teal-500" : ""}`} />
-                          <span>{effectiveClinicalSidebarCollapsed ? "Mostrar Menú" : "Contraer Menú"}</span>
-                        </button>
-
-                        {/* Modo Zen Quick Toggle */}
-                        <button
-                          onClick={() => {
-                            const nextZen = !isZenMode;
-                            setIsZenMode(nextZen);
-                            localStorage.setItem("perioZenMode", String(nextZen));
-                            if (nextZen) {
-                              setIsSidebarCollapsed(true);
-                              setIsClinicalSidebarCollapsed(true);
-                            } else {
-                              setIsSidebarCollapsed(false);
-                              setIsClinicalSidebarCollapsed(false);
+                )}
+                
+                {/* CENTRAL ACTIVE WORKSPACE COMPONENT PANEL */}
+                <div className="min-w-0 bg-white/40 dark:bg-slate-900/5 rounded-2xl flex flex-col gap-4">
+                  {/* Categorized Station Selector Header */}
+                  {!isZenMode && (
+                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 p-2 rounded-2xl space-y-2 shadow-xs">
+                      
+                      {/* Top Bar Categories */}
+                      <div className="flex items-center justify-between gap-2 overflow-x-auto hide-scrollbar pb-1 border-b border-slate-100 dark:border-slate-800/80">
+                        <div className="flex items-center gap-1 shrink-0">
+                          {[
+                            {
+                              id: "evaluacion",
+                              label: "Diagnóstico & Ficha",
+                              icon: Stethoscope,
+                              items: ["ficha", "especialidad", "xrays"]
+                            },
+                            {
+                              id: "periodoncia",
+                              label: "Examen Dental y Periodontal",
+                              icon: Activity,
+                              items: ["odontograma", "periodontograma", "pra", "oleary"]
+                            },
+                            {
+                              id: "gestion",
+                              label: "Evolución & Planes",
+                              icon: Sparkles,
+                              items: ["soap", "presupuesto"]
                             }
-                          }}
-                          className={`hidden lg:flex px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-all duration-200 items-center gap-2 cursor-pointer border shrink-0 ${
-                            isZenMode
-                              ? "bg-emerald-500/15 border-emerald-550/35 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-950/10 animate-pulse"
-                              : "bg-slate-50/60 hover:bg-slate-100/80 dark:bg-slate-800/20 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400"
-                          }`}
-                          title={isZenMode ? "Salir de Modo Zen (Espacio Normal)" : "Activar Modo Zen (Espacio Completo)"}
-                        >
-                          <Sparkles className={`w-3.5 h-3.5 ${isZenMode ? "text-emerald-500" : "text-slate-400"}`} />
-                          <span>{isZenMode ? "Modo Zen Activo" : "Modo Zen"}</span>
-                        </button>
+                          ].map(cat => {
+                            const Icon = cat.icon;
+                            const isCatActive = cat.items.includes(clinicalSubView);
+                            return (
+                              <button
+                                key={cat.id}
+                                onClick={() => {
+                                  if (cat.items.length > 0) setClinicalSubView(cat.items[0] as any);
+                                }}
+                                className={`relative px-3 py-1.5 rounded-xl text-xs font-black tracking-wide transition-colors flex items-center gap-2 cursor-pointer border ${
+                                  isCatActive
+                                    ? "border-slate-900 dark:border-slate-100 text-white dark:text-slate-900 shadow-xs"
+                                    : "bg-slate-50 dark:bg-slate-800/40 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 border-transparent hover:bg-slate-100"
+                                }`}
+                              >
+                                {isCatActive && (
+                                  <motion.div
+                                    layoutId="catActivePillBg"
+                                    className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-xl z-0"
+                                    transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                                  />
+                                )}
+                                <Icon className="w-3.5 h-3.5 relative z-10" />
+                                <span className="relative z-10">{cat.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
 
+                        {/* Right Quick Controls (Zen Toggle) */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              const nextZen = !isZenMode;
+                              setIsZenMode(nextZen);
+                              localStorage.setItem("perioZenMode", String(nextZen));
+                              if (nextZen) {
+                                setIsSidebarCollapsed(true);
+                                setIsClinicalSidebarCollapsed(true);
+                              } else {
+                                setIsSidebarCollapsed(false);
+                                setIsClinicalSidebarCollapsed(false);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer border ${
+                              isZenMode
+                                ? "bg-emerald-500/15 border-emerald-550/35 text-emerald-600 dark:text-emerald-400 shadow-md animate-pulse"
+                                : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
+                            }`}
+                            title={isZenMode ? "Salir de Modo Zen" : "Activar Modo Zen"}
+                          >
+                            <Sparkles className={`w-3.5 h-3.5 ${isZenMode ? "text-emerald-500" : "text-slate-400"}`} />
+                            <span className="hidden sm:inline">{isZenMode ? "Modo Zen Activo" : "Modo Zen"}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Station Pills Row */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar px-1 py-0.5 scroll-smooth relative">
                         {[
-                          { id: "ficha", label: "Ficha & Anamnesis", icon: User, badge: "Anamnesis", color: "border-blue-500/20 text-blue-600 dark:text-blue-400" },
-                          { id: "especialidad", label: "Consola Especialidades", icon: Stethoscope, badge: "Espec", color: "border-teal-500/20 text-teal-600 dark:text-teal-400" },
-                          { id: "odontograma", label: "Odontograma", icon: Smile, badge: "Dental", color: "border-pink-500/20 text-pink-600 dark:text-pink-400" },
-                          { id: "periodontograma", label: "Periodontograma", icon: Activity, badge: "Encías", color: "border-emerald-500/20 text-emerald-600 dark:text-emerald-400" },
-                          { id: "pra", label: "Riesgo PRA", icon: TrendingUp, badge: "Análisis", color: "border-rose-500/20 text-rose-650 dark:text-rose-450" },
-                          { id: "oleary", label: "Índice O'Leary", icon: ClipboardList, badge: "Placa", color: "border-amber-500/20 text-amber-600 dark:text-amber-450" },
-                          { id: "xrays", label: "Tomografías", icon: HeartPulse, badge: "Rx", color: "border-sky-500/20 text-sky-600 dark:text-sky-400" },
-                          { id: "soap", label: "Redactor SOAP AI", icon: Sparkles, badge: "Copiloto", color: "border-indigo-500/20 text-indigo-600 dark:text-indigo-400" },
-                          { id: "presupuesto", label: "Presupuestos", icon: Banknote, badge: "Planes", color: "border-purple-500/20 text-purple-600 dark:text-purple-400" }
+                          { id: "ficha", label: "Ficha & Anamnesis", icon: User, badge: "Ficha", cat: "evaluacion" },
+                          { id: "especialidad", label: "Consola Especialidades", icon: Stethoscope, badge: "Espec", cat: "evaluacion" },
+                          { id: "xrays", label: "Tomografías & Rx", icon: HeartPulse, badge: "Rx", cat: "evaluacion" },
+                          { id: "odontograma", label: "Odontograma", icon: Smile, badge: "Dental", cat: "periodoncia" },
+                          { id: "periodontograma", label: "Periodontograma", icon: Activity, badge: "Encías", cat: "periodoncia" },
+                          { id: "pra", label: "Riesgo PRA", icon: TrendingUp, badge: "PRA", cat: "periodoncia" },
+                          { id: "oleary", label: "Índice O'Leary", icon: ClipboardList, badge: "Placa", cat: "periodoncia" },
+                          { id: "soap", label: "Redactor SOAP (AI)", icon: Sparkles, badge: "AI Copilot", cat: "gestion" },
+                          { id: "presupuesto", label: "Presupuestos & Planes", icon: Banknote, badge: "Planes", cat: "gestion" }
                         ].map(st => {
                           const IconComponent = st.icon;
                           const isStationActive = clinicalSubView === st.id;
@@ -1060,18 +1079,25 @@ export default function App() {
                             <button
                               key={st.id}
                               onClick={() => setClinicalSubView(st.id as any)}
-                              className={`px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-all duration-150 flex items-center gap-2 whitespace-nowrap cursor-pointer border shrink-0 ${
+                              className={`relative px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-colors duration-150 flex items-center gap-2 whitespace-nowrap cursor-pointer border shrink-0 ${
                                 isStationActive
-                                  ? "bg-teal-600 border-teal-600 text-white shadow-sm scale-102"
-                                  : "bg-white/60 dark:bg-slate-900/50 border-slate-200/50 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                                  ? "border-teal-600 text-white shadow-xs scale-[1.01]"
+                                  : "bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
                               }`}
                             >
-                              <IconComponent className={`w-3.5 h-3.5 ${isStationActive ? 'text-white' : 'text-slate-400'}`} />
-                              <span>{st.label}</span>
-                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                              {isStationActive && (
+                                <motion.div
+                                  layoutId="stationActivePillBg"
+                                  className="absolute inset-0 bg-teal-600 rounded-xl z-0"
+                                  transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                                />
+                              )}
+                              <IconComponent className={`w-3.5 h-3.5 relative z-10 ${isStationActive ? 'text-white' : 'text-teal-600 dark:text-teal-400'}`} />
+                              <span className="relative z-10">{st.label}</span>
+                              <span className={`relative z-10 text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md ${
                                 isStationActive 
                                   ? 'bg-white/20 text-white' 
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-450 dark:text-slate-500'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                               }`}>
                                 {st.badge}
                               </span>
@@ -1079,23 +1105,18 @@ export default function App() {
                           );
                         })}
                       </div>
-                      <button 
-                        onClick={() => scrollClinicalNav('right')}
-                        className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors shrink-0 cursor-pointer hidden sm:flex"
-                        title="Desplazar a la derecha"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
                     </div>
+                  )}
 
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={clinicalSubView}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -12 }}
-                        transition={{ duration: 0.18, ease: "easeOut" }}
-                      >
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={clinicalSubView}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.1, ease: "easeOut" }}
+                    >
+                      <Suspense fallback={<ClinicalViewSkeleton />}>
                         {clinicalSubView === "ficha" ? (
                           <PatientFile 
                             patient={activePatient}
@@ -1105,80 +1126,80 @@ export default function App() {
                             onClose={() => setActivePatientId("")}
                           />
                         ) : clinicalSubView === "especialidad" ? (
-                          <SpecialtyWorkspace
-                            patient={activePatient}
-                            onUpdatePatient={(updatedPat) => {
-                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                            }}
-                            onNavigateToSubView={(subView) => setClinicalSubView(subView as any)}
-                          />
-                        ) : clinicalSubView === "odontograma" ? (
-                          <Odontograma 
-                            odontogram={activePatient.odontogram} 
-                            onChange={handleUpdateOdontogram}
-                          />
-                        ) : clinicalSubView === "periodontograma" ? (
-                          <Periodontograma 
-                            periodontogram={activePatient.periodontogram}
-                            onChange={handleUpdatePeriodontogram}
-                            odontogram={activePatient.odontogram}
-                            patient={activePatient}
-                            onUpdatePatient={(updatedPat) => {
-                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                            }}
-                          />
-                        ) : clinicalSubView === "pra" ? (
-                          <PRARiskAssessment 
-                            periodontogram={activePatient.periodontogram}
-                            odontogram={activePatient.odontogram}
-                            patient={activePatient}
-                            onUpdatePatient={(updatedPat) => {
-                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                            }}
-                          />
-                        ) : clinicalSubView === "oleary" ? (
-                          <OLearyControl 
-                            patient={activePatient}
-                            onUpdate={(newO) => {
-                              setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, oLeary: newO } : p))
-                            }}
-                          />
-                        ) : clinicalSubView === "xrays" ? (
-                          <XRayGallery
-                            patient={activePatient}
-                            onUpdate={(newX) => {
-                               setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, xRays: newX } : p))
-                            }}
-                          />
-                        ) : clinicalSubView === "soap" ? (
-                          <SoapAIAssistant 
-                            patient={activePatient} 
-                            doctorName={doctorName}
-                            onUpdatePatient={(updatedPat) => {
-                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                            }}
-                          />
-                        ) : (
-                          <TreatmentPlanModule 
-                            patient={activePatient}
-                            aranceles={aranceles}
-                            onUpdatePatient={(updatedPat) => {
-                              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
-                            }}
-                          />
-                        )}
-                      </motion.div>
-                    </AnimatePresence>
+                            <SpecialtyWorkspace
+                              patient={activePatient}
+                              onUpdatePatient={(updatedPat) => {
+                                setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                              }}
+                              onNavigateToSubView={(subView) => setClinicalSubView(subView as any)}
+                            />
+                          ) : clinicalSubView === "odontograma" ? (
+                            <Odontograma 
+                              odontogram={activePatient.odontogram} 
+                              onChange={handleUpdateOdontogram}
+                            />
+                          ) : clinicalSubView === "periodontograma" ? (
+                            <Periodontograma 
+                              periodontogram={activePatient.periodontogram}
+                              onChange={handleUpdatePeriodontogram}
+                              odontogram={activePatient.odontogram}
+                              patient={activePatient}
+                              onUpdatePatient={(updatedPat) => {
+                                setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                              }}
+                            />
+                          ) : clinicalSubView === "pra" ? (
+                            <PRARiskAssessment 
+                              periodontogram={activePatient.periodontogram}
+                              odontogram={activePatient.odontogram}
+                              patient={activePatient}
+                              onUpdatePatient={(updatedPat) => {
+                                setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                              }}
+                            />
+                          ) : clinicalSubView === "oleary" ? (
+                            <OLearyControl 
+                              patient={activePatient}
+                              onUpdate={(newO) => {
+                                setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, oLeary: newO } : p))
+                              }}
+                            />
+                          ) : clinicalSubView === "xrays" ? (
+                            <XRayGallery
+                              patient={activePatient}
+                              onUpdate={(newX) => {
+                                 setPatients(prev => prev.map(p => p.id === activePatient.id ? { ...p, xRays: newX } : p))
+                              }}
+                            />
+                          ) : clinicalSubView === "soap" ? (
+                            <SoapAIAssistant 
+                              patient={activePatient} 
+                              doctorName={doctorName}
+                              onUpdatePatient={(updatedPat) => {
+                                setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                              }}
+                            />
+                          ) : (
+                            <TreatmentPlanModule 
+                              patient={activePatient}
+                              aranceles={aranceles}
+                              onUpdatePatient={(updatedPat) => {
+                                setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+                              }}
+                            />
+                          )}
+                      </Suspense>
+                    </motion.div>
+                  </AnimatePresence>
                   </div>
-                </div> {/* End pattern responsive clinical containment */}
-              </div>
-            ) : (
+                </div>
+              ) : (
               <div className="bg-slate-50/50 dark:bg-slate-900/40 p-8 rounded-3xl border border-slate-205 dark:border-slate-800 text-center space-y-6 shadow-sm">
                 <div className="max-w-md mx-auto space-y-2">
                   <div className="w-14 h-14 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl flex items-center justify-center border border-teal-500/20 mx-auto">
                     <ClipboardList className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-display font-black text-slate-850 dark:text-white">Estación de Diagnóstico Clínico</h3>
+                  <h3 className="text-base font-display font-black text-slate-800 dark:text-white">Estación de Diagnóstico Clínico</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                     Por favor, selecciona un expediente médico para habilitar el Odontograma anatómico y el Periodontograma paramétrico:
                   </p>
@@ -1204,7 +1225,7 @@ export default function App() {
                           setActivePatientId(p.id);
                           setClinicalSubView("especialidad");
                         }}
-                        className="p-5 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/80 rounded-2xl hover:border-teal-500/50 hover:shadow-md transition-all cursor-pointer text-left group flex flex-col justify-between h-40"
+                        className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl hover:border-teal-500/50 hover:shadow-md transition-all cursor-pointer text-left group flex flex-col justify-between h-40"
                       >
                         <div className="space-y-1 w-full">
                           <div className="flex items-center justify-between gap-2">
@@ -1218,13 +1239,13 @@ export default function App() {
                           <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
                             {p.name}
                           </h4>
-                          <p className="text-[10px] text-slate-450 dark:text-slate-500 truncate">
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
                             🎂 {p.birthdate}  |  📞 {p.phone}
                           </p>
                         </div>
 
                         <div className="border-t border-slate-100 dark:border-slate-800/60 pt-3 w-full flex items-center justify-between text-[10px]">
-                          <span className="font-semibold text-slate-450 dark:text-slate-400">
+                          <span className="font-semibold text-slate-400 dark:text-slate-400">
                             Bolsas &ge; 4mm: <strong className="text-indigo-650 dark:text-indigo-400 font-bold">{pockets}</strong>
                           </span>
                           <span className="text-teal-600 dark:text-teal-400 font-black uppercase tracking-wider inline-flex items-center gap-1">
@@ -1242,7 +1263,7 @@ export default function App() {
                       setActiveTab("pacientes");
                       setShowRegisterForm(true);
                     }}
-                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-705 text-slate-700 dark:text-slate-350 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" /> Registrar Nuevo Expediente
                   </button>
@@ -1263,8 +1284,29 @@ export default function App() {
             appointments={appointments}
             onNavigateTo={(tab) => setActiveTab(tab as ActiveTab)}
             onSelectPatient={(id) => setActivePatientId(id)}
+            onUpdatePatient={(updatedPat) => {
+              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+            }}
           />
         );
+
+      case "flujo":
+        return (
+          <ClinicalFlowTracker
+            patients={patients}
+            onUpdatePatient={(updatedPat) => {
+              setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+            }}
+            onSelectPatient={(id) => {
+              setActivePatientId(id);
+              setActiveTab("clinica");
+              setClinicalSubView("ficha");
+            }}
+          />
+        );
+
+      case "clinica":
+        return renderWorkspace();
 
       case "agenda":
         return (
@@ -1282,224 +1324,35 @@ export default function App() {
         return <DirectorioEmpleos />;
 
       case "pacientes":
-        const filtered = patients.filter((p) => 
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.phone.includes(searchQuery)
-        );
-
         if (activePatientId) {
           return renderWorkspace();
         }
 
         return (
-          <div className="space-y-6" id="pacientes-control">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/80">
-              <div>
-                <h3 className="text-lg font-display font-semibold text-slate-800 dark:text-white">Directorio y Registro Clínico</h3>
-                <p className="text-xs text-slate-400 font-normal">Existen {patients.length} expedientes completos almacenados localmente bajo encriptación</p>
-              </div>
-
-              <button
-                onClick={() => setShowRegisterForm(!showRegisterForm)}
-                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-all shadow-md inline-flex items-center gap-1.5 self-start sm:self-center"
-              >
-                <Plus className="w-4 h-4" /> 
-                <span>Registrar Paciente</span>
-              </button>
-            </div>
-
-            {/* Quick Registration Form Modal */}
-            <AnimatePresence>
-              {showRegisterForm && (
-                <motion.form 
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  onSubmit={handleRegisterPatient} 
-                  className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800/80 space-y-4 shadow-xl"
-                >
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3 w-full">
-                    <UserPlus className="w-4 h-4 text-teal-600" />
-                    <span>{editingPatientId ? "Editar Expediente" : "Nuevo Expediente Histórico Odontorradicular"}</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-slate-400 font-bold block uppercase tracking-wider">Nombre Completo:</label>
-                      <input 
-                        type="text" 
-                        placeholder="P. ej., Mario Alberto Rojas"
-                        value={newPatientName}
-                        onChange={(e) => setNewPatientName(e.target.value)}
-                        className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20 text-slate-800 dark:text-slate-100"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-slate-400 font-bold block uppercase tracking-wider">Teléfono de Enlace:</label>
-                      <input 
-                        type="text" 
-                        placeholder="+56 9 8234 1928"
-                        value={newPatientPhone}
-                        onChange={(e) => setNewPatientPhone(e.target.value)}
-                        className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-slate-400 font-bold block uppercase tracking-wider">Correo Electrónico:</label>
-                      <input 
-                        type="email" 
-                        placeholder="mario@email.com"
-                        value={newPatientEmail}
-                        onChange={(e) => setNewPatientEmail(e.target.value)}
-                        className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-slate-400 font-bold block uppercase tracking-wider">Nacimiento:</label>
-                      <input 
-                        type="date" 
-                        value={newPatientBirthdate}
-                        onChange={(e) => setNewPatientBirthdate(e.target.value)}
-                        className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 md:col-span-2 lg:col-span-4">
-                      <label className="text-xs text-slate-500 font-bold block uppercase tracking-wider">Antecedentes Clínicos, Patologías Generales o Alergias:</label>
-                      <textarea 
-                        placeholder="P. ej., Hipertenso, Alérgico a la Penicilina o anestésicos, diabetes mellitus tipo II..."
-                        value={newPatientNotes}
-                        onChange={(e) => setNewPatientNotes(e.target.value)}
-                        rows={2}
-                        className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowRegisterForm(false);
-                        setEditingPatientId(null);
-                        setNewPatientName("");
-                        setNewPatientPhone("");
-                        setNewPatientEmail("");
-                        setNewPatientBirthdate("");
-                        setNewPatientNotes("");
-                      }}
-                      className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-all"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs py-2.5 px-5 rounded-xl cursor-pointer transition-all shadow-md"
-                    >
-                      {editingPatientId ? "Guardar Cambios" : "Crear Ficha y Habilitar Periodonto"}
-                    </button>
-                  </div>
-                </motion.form>
-              )}
-            </AnimatePresence>
-
-              {/* Intutive Patient Data Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-0 overflow-hidden shadow-xs">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/20">
-                  <div className="relative max-w-md">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                      <Search className="w-4.5 h-4.5" />
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Filtrar por nombre, correo electrónico o número telefónico..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full text-sm p-3 pl-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-800 dark:text-slate-200 shadow-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-                    <thead className="text-xs uppercase bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold tracking-wider">
-                      <tr>
-                        <th className="px-6 py-4">Paciente</th>
-                        <th className="px-6 py-4">Contacto</th>
-                        <th className="px-6 py-4 text-center">Fichas Clínicas</th>
-                        <th className="px-6 py-4 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filtered.map((p) => (
-                        <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center font-display font-black text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800 uppercase shadow-sm">
-                                {p.name.charAt(0)}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 dark:text-white">{p.name}</div>
-                                <div className="text-xs text-slate-400">ID: {p.id.split('-')[1]}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-slate-700 dark:text-slate-300">📞 {p.phone}</div>
-                            <div className="text-slate-400 text-xs mt-0.5">✉️ {p.email}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setActivePatientId(p.id);
-                                  setClinicalSubView("ficha");
-                                }}
-                                className="bg-teal-50 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400 hover:bg-teal-100 hover:text-teal-800 border border-teal-100 dark:border-teal-800 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
-                              >
-                                Abrir Expediente
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                             <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => startEditPatient(p)}
-                                  className="p-2 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 rounded-lg transition-all"
-                                  title="Editar"
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                </button>
-                                <button
-                                  onClick={() => handleDeletePatient(p.id)}
-                                  className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-all"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filtered.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-light text-sm">
-                            <Activity className="w-8 h-8 opacity-20 mx-auto mb-2" />
-                            No se encontraron pacientes que coincidan con la búsqueda.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-          </div>
+          <PatientDirectory
+            patients={patients}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            setActivePatientId={setActivePatientId}
+            setClinicalSubView={setClinicalSubView}
+            startEditPatient={startEditPatient}
+            handleDeletePatient={handleDeletePatient}
+            showRegisterForm={showRegisterForm}
+            setShowRegisterForm={setShowRegisterForm}
+            editingPatientId={editingPatientId}
+            setEditingPatientId={setEditingPatientId}
+            handleRegisterPatient={handleRegisterPatient}
+            newPatientName={newPatientName}
+            setNewPatientName={setNewPatientName}
+            newPatientPhone={newPatientPhone}
+            setNewPatientPhone={setNewPatientPhone}
+            newPatientEmail={newPatientEmail}
+            setNewPatientEmail={setNewPatientEmail}
+            newPatientBirthdate={newPatientBirthdate}
+            setNewPatientBirthdate={setNewPatientBirthdate}
+            newPatientNotes={newPatientNotes}
+            setNewPatientNotes={setNewPatientNotes}
+          />
         );
 
       case "finanzas":
@@ -1563,7 +1416,7 @@ export default function App() {
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                      💵 Aranceles y Honorarios de Tratamientos
                   </h4>
-                  <p className="text-xs text-slate-450 mt-0.5">Modifica los aranceles vigentes. Al emitir presupuestos clínicos se aplicarán estos valores predeterminados.</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Modifica los aranceles vigentes. Al emitir presupuestos clínicos se aplicarán estos valores predeterminados.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1631,16 +1484,16 @@ export default function App() {
 
             {/* Profile Specific Administrative and Audit card for CLINICA / UNIVERSIDAD */}
             {activeUser?.profile === "clinica" && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs animate-fade-in">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs animate-fade-in">
                 <div>
                   <span className="text-[9px] font-black uppercase text-pink-600 bg-pink-500/10 px-2 py-0.5 rounded border border-pink-500/15">Módulo de Auditoría</span>
                   <h4 className="text-md font-bold mt-2 text-slate-900 dark:text-white">Panel de Administración y Auditoría</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Nivel: Administrador Clínico Total. Monitoreo de eventos y seguridad del terminal.</p>
                 </div>
 
-                <div className="border border-slate-150 dark:border-slate-800 rounded-xl overflow-hidden text-xs">
-                  <div className="bg-slate-50 dark:bg-slate-950 px-4 py-2 border-b border-slate-150 dark:border-slate-800 text-slate-400 uppercase tracking-widest text-[9px] font-bold">Registro de Cambios y Accesos Recientes</div>
-                  <div className="divide-y divide-slate-150 dark:divide-slate-800/60 font-mono text-[10.5px]">
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden text-xs">
+                  <div className="bg-slate-50 dark:bg-slate-950 px-4 py-2 border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-widest text-[9px] font-bold">Registro de Cambios y Accesos Recientes</div>
+                  <div className="divide-y divide-slate-200 dark:divide-slate-800/60 font-mono text-[10.5px]">
                     <div className="p-3 flex justify-between">
                       <span className="text-slate-400">09-Jun 01:05:26</span>
                       <span className="text-emerald-500 font-bold">USUARIO_REGISTRO_OK</span>
@@ -1662,7 +1515,7 @@ export default function App() {
             )}
 
             {activeUser?.profile === "universidad" && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs animate-fade-in">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs animate-fade-in">
                 <div>
                   <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/15">Orientado a Docencia</span>
                   <h4 className="text-md font-bold mt-2 text-slate-900 dark:text-white">Herramientas Académicas e Investigación</h4>
@@ -1670,14 +1523,14 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-3 flex items-center gap-3 border border-slate-150 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/25">
+                  <div className="p-3 flex items-center gap-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/25">
                     <span className="text-xl">🎓</span>
                     <div>
                       <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Asistencia de Alumnos</p>
                       <span className="text-[9.5px] text-slate-400 font-light block leading-tight mt-0.5">Valida el aprendizaje clínico del internado</span>
                     </div>
                   </div>
-                  <div className="p-3 flex items-center gap-3 border border-slate-150 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/25">
+                  <div className="p-3 flex items-center gap-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/25">
                     <span className="text-xl">🧬</span>
                     <div>
                       <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Protocolos Periodontales</p>
@@ -1721,12 +1574,23 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen font-sans ${darkMode ? "dark" : "bg-slate-50"} flex flex-col md:flex-row relative`}>
+    <div className={`min-h-screen font-sans ${darkMode ? "dark text-slate-100 bg-[#040814]" : "bg-slate-50 text-slate-900"} flex flex-col md:flex-row relative transition-colors duration-300`}>
       {/* Dynamic Cosmic Slate Background (Visible in Dark Mode) */}
       {darkMode && (
-        <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden no-print">
-          <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-teal-900/20 blur-[120px] rounded-full" />
-          <div className="absolute top-[40%] -right-[20%] w-[60%] h-[60%] bg-emerald-900/10 blur-[120px] rounded-full" />
+        <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden no-print bg-[#040814]">
+          {/* Pulsating deep ambient blobs */}
+          <div className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] bg-teal-950/30 blur-[130px] rounded-full animate-[pulse_10s_ease-in-out_infinite]" />
+          <div className="absolute top-[30%] -right-[15%] w-[70%] h-[70%] bg-emerald-950/20 blur-[140px] rounded-full animate-[pulse_12s_ease-in-out_infinite_alternate]" />
+          <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[50%] bg-cyan-950/25 blur-[120px] rounded-full animate-[pulse_8s_ease-in-out_infinite_2s]" />
+          
+          {/* Futuristic grid mask for high-fidelity sci-fi/clinical feel */}
+          <div 
+            className="absolute inset-0 opacity-[0.03] mix-blend-overlay"
+            style={{ 
+              backgroundImage: 'radial-gradient(rgba(20, 184, 166, 0.4) 1.5px, transparent 1.5px)', 
+              backgroundSize: '24px 24px' 
+            }} 
+          />
         </div>
       )}
 
@@ -1793,55 +1657,113 @@ export default function App() {
           </button>
         </div>
 
+        {/* Onboarding Guide Trigger */}
+        <div className={`px-4 mb-4 ${effectiveSidebarCollapsed ? 'hidden' : ''}`}>
+          <button 
+            onClick={() => setShowHelpPanel(true)}
+            className="w-full py-2 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 hover:from-teal-500/20 hover:to-emerald-500/20 border border-teal-500/20 text-teal-700 dark:text-teal-300 rounded-xl transition-all flex items-center justify-between px-3 text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-500 group-hover:animate-bounce" />
+              <span className="text-[10.5px] font-bold">Guía de Aprendizaje</span>
+            </div>
+            <span className="text-[9px] bg-teal-500 text-white font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+              {learningMode ? 'ON' : 'Ayuda'}
+            </span>
+          </button>
+        </div>
+
         {/* Navigation panel Links */}
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className="flex-1 px-3 space-y-4 overflow-y-auto hide-scrollbar">
           {[
-            { id: "dashboard", label: "Panel Principal", icon: LayoutDashboard },
-            { id: "pacientes", label: "Pacientes", icon: Users },
-            { id: "agenda", label: "Agenda Médica", icon: Calendar },
-            { id: "finanzas", label: "Plan & Finanzas", icon: Banknote },
-            { id: "bolsa-empleo", label: "Bolsa de Empleo", icon: Briefcase },
-            { id: "reportes", label: "Imp / Reportes", icon: Printer },
-            { id: "dentalstories", label: "DentalStories", icon: MessageSquare },
-            { id: "tienda", label: "Mercado Dental", icon: ShoppingBag },
-            { id: "ajustes", label: "Ajustes", icon: Settings }
-          ].map((item) => {
-            const ActiveIcon = item.icon;
-            const isActive = activeTab === item.id;
-            const isNeon = item.id === "dentalstories" || item.id === "tienda" || item.id === "bolsa-empleo";
-            return (
-              <button
-                key={item.id}
-                title={effectiveSidebarCollapsed ? item.label : undefined}
-                onClick={() => {
-                  if (item.id === "pacientes") {
-                    setActivePatientId("");
-                  }
-                  setActiveTab(item.id as ActiveTab);
-                }}
-                className={`w-full text-left font-bold text-xs py-3 rounded-xl transition-all cursor-pointer inline-flex items-center gap-3 ${effectiveSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'} ${
-                  isActive
-                    ? isNeon
-                      ? "bg-gradient-to-r from-teal-600 via-teal-500 to-indigo-650 text-white shadow-[0_0_16px_rgba(20,184,166,0.55)] scale-[1.03]"
-                      : "bg-teal-600 text-white shadow-md shadow-teal-600/10"
-                    : isNeon
-                    ? "text-slate-500 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_0_10px_rgba(20,184,166,0.25)] hover:scale-[1.01] dark:text-slate-450 dark:hover:bg-slate-800/40 dark:hover:text-slate-100"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-100"
-                }`}
-              >
-                <div className={`relative flex items-center justify-center shrink-0 ${isNeon ? "w-6 h-6 rounded-md overflow-hidden neon-intense-glow" : ""}`}>
-                  {isNeon && (
-                     <>
-                        <div className="absolute inset-0 neon-rainbow-bg rounded-md pointer-events-none opacity-100" />
-                        <div className={`absolute inset-[1.5px] rounded-[4px] z-0 pointer-events-none transition-colors ${isActive ? (item.id === "tienda" ? 'bg-teal-650' : 'bg-teal-600') : 'bg-white group-hover:bg-slate-50 dark:bg-slate-900 dark:group-hover:bg-slate-800/40'}`} />
-                     </>
-                  )}
-                  <ActiveIcon className={`w-4 h-4 relative z-10 ${isNeon ? (isActive ? 'text-white scale-110' : 'text-slate-700 dark:text-slate-200') : ''}`} />
-                </div>
-                {!effectiveSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
-              </button>
-            );
-          })}
+            {
+              category: "Atención Clínica",
+              items: [
+                { id: "clinica", label: "Estación Clínica", icon: Stethoscope },
+                { id: "pacientes", label: "Expedientes", icon: Users },
+                { id: "flujo", label: "Flujo & Sillones", icon: Activity },
+                { id: "agenda", label: "Agenda Médica", icon: Calendar },
+              ]
+            },
+            {
+              category: "Gestión & Análisis",
+              items: [
+                { id: "dashboard", label: "Panel Principal", icon: LayoutDashboard },
+                { id: "finanzas", label: "Plan & Finanzas", icon: Banknote },
+                { id: "reportes", label: "Imp / Reportes", icon: Printer },
+              ]
+            },
+            {
+              category: "Comunidad & Mercado",
+              items: [
+                { id: "dentalstories", label: "DentalStories", icon: MessageSquare },
+                { id: "tienda", label: "Mercado Dental", icon: ShoppingBag },
+                { id: "bolsa-empleo", label: "Bolsa de Empleo", icon: Briefcase },
+              ]
+            },
+            {
+              category: "Sistema",
+              items: [
+                { id: "ajustes", label: "Ajustes", icon: Settings }
+              ]
+            }
+          ].map((group) => (
+            <div key={group.category} className="space-y-1">
+              {!effectiveSidebarCollapsed && (
+                <span className="px-3 text-[9.5px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block pb-1">
+                  {group.category}
+                </span>
+              )}
+              {group.items.map((item) => {
+                const ActiveIcon = item.icon;
+                const isActive = activeTab === item.id;
+                const isNeon = item.id === "dentalstories" || item.id === "tienda" || item.id === "bolsa-empleo";
+                return (
+                  <button
+                    key={item.id}
+                    title={effectiveSidebarCollapsed ? item.label : undefined}
+                    onClick={() => {
+                      if (item.id === "pacientes") {
+                        setActivePatientId("");
+                      }
+                      setActiveTab(item.id as ActiveTab);
+                    }}
+                    className={`relative w-full text-left font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-3 ${effectiveSidebarCollapsed ? 'justify-center px-1' : 'px-3.5'} ${
+                      isActive
+                        ? isNeon
+                          ? "text-white shadow-[0_0_16px_rgba(20,184,166,0.55)] scale-[1.01]"
+                          : "text-white shadow-md shadow-teal-600/10"
+                        : isNeon
+                        ? "text-slate-500 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_0_10px_rgba(20,184,166,0.25)] dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-100"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-100"
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="sidebarActivePillBg"
+                        className={`absolute inset-0 rounded-xl z-0 ${
+                          isNeon
+                            ? "bg-gradient-to-r from-teal-600 via-teal-500 to-indigo-650"
+                            : "bg-teal-600"
+                        }`}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <div className={`relative z-10 flex items-center justify-center shrink-0 ${isNeon ? "w-5 h-5 rounded-md overflow-hidden neon-intense-glow" : ""}`}>
+                      {isNeon && (
+                        <>
+                          <div className="absolute inset-0 neon-rainbow-bg rounded-md pointer-events-none opacity-100" />
+                          <div className={`absolute inset-[1.5px] rounded-[4px] z-0 pointer-events-none transition-colors ${isActive ? (item.id === "tienda" ? 'bg-teal-650' : 'bg-teal-600') : 'bg-white group-hover:bg-slate-50 dark:bg-slate-900 dark:group-hover:bg-slate-800/40'}`} />
+                        </>
+                      )}
+                      <ActiveIcon className={`w-4 h-4 relative z-10 ${isNeon ? (isActive ? 'text-white scale-110' : 'text-slate-700 dark:text-slate-200') : ''}`} />
+                    </div>
+                    {!effectiveSidebarCollapsed && <span className="relative z-10 whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
 
           <button
             onClick={handleLogout}
@@ -1867,106 +1789,149 @@ export default function App() {
         )}
       </aside>
 
-      {/* MOBILE CONTAINER HEADER */}
-      <header className="md:hidden w-full bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-4 flex justify-between items-center z-10 sticky top-0 shadow-xs no-print">
-        <div className="flex items-center gap-3">
-          <Logo className="w-8 h-8" showNeon={true} />
-          <span className="font-display font-bold text-sm tracking-tight text-slate-800 dark:text-white mt-1">PerioDash SaaS</span>
-        </div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <InteractiveHelpPanel
+          activePatient={activePatient}
+          onUpdatePatient={(updatedPat) => {
+            setPatients(prev => prev.map(p => p.id === updatedPat.id ? updatedPat : p));
+          }}
+          activeTab={activeTab}
+          clinicalSubView={clinicalSubView}
+          onNavigate={(tab, subView) => {
+            setActiveTab(tab);
+            if (subView) {
+              setClinicalSubView(subView);
+            }
+          }}
+          darkMode={darkMode}
+          isOpen={showHelpPanel}
+          onClose={() => setShowHelpPanel(!showHelpPanel)}
+          learningMode={learningMode}
+          setLearningMode={setLearningMode}
+        />
 
-        <div className="flex items-center gap-1.5">
-          <button 
-            onClick={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
-            className="text-teal-600 dark:text-teal-400 p-2 border border-slate-50 dark:border-slate-800 rounded-xl cursor-pointer bg-slate-50/50 dark:bg-slate-800/50 hover:bg-teal-50 dark:hover:bg-teal-950/20"
-            title="Buscador rápido"
-          >
-            <Search className="w-4 h-4" />
-          </button>
+        {/* MOBILE CONTAINER HEADER */}
+        <header className="md:hidden w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 p-3.5 flex justify-between items-center z-20 sticky top-0 shadow-xs no-print">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsMobileDrawerOpen(true)}>
+            <Logo className="w-7 h-7" showNeon={true} />
+            <div className="flex flex-col">
+              <span className="font-display font-bold text-xs tracking-tight text-slate-800 dark:text-white leading-none">PerioDash</span>
+              <span className="text-[9px] text-teal-600 dark:text-teal-400 font-extrabold uppercase tracking-widest mt-0.5">Clinical Suite</span>
+            </div>
+          </div>
 
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className="text-slate-500 dark:text-slate-300 p-2 border border-slate-50 dark:border-slate-800 rounded-xl cursor-pointer bg-transparent"
-          >
-            {darkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-750" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {activePatient && (
+              <button
+                onClick={() => { setActiveTab('clinica'); setClinicalSubView('ficha'); }}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 dark:bg-teal-950/60 border border-teal-500/30 rounded-full text-teal-700 dark:text-teal-300 text-[10px] font-bold cursor-pointer"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="truncate max-w-[80px]">{activePatient.name.split(' ')[0]}</span>
+              </button>
+            )}
 
-          <button 
-            onClick={handleLogout}
-            className="text-red-500 dark:text-red-400 p-2 border border-slate-50 dark:border-slate-800 rounded-xl cursor-pointer bg-transparent hover:bg-red-500/10"
-            title="Cerrar sesión"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* VIEWPORT AREA CONTENT */}
-      <main className="flex-1 w-full p-4 md:p-8 space-y-6 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-8 relative z-0 print:p-0 print:m-0 print:overflow-visible">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
-          >
-            {renderTabContent()}
-          </motion.div>
-        </AnimatePresence>
-      </main>
-
-      {/* MOBILE IOS BOTTOM TAB NAV BAR */}
-      <nav 
-        id="mobile-bottom-nav" 
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-40 flex justify-between items-end px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)] shadow-[0_-4px_10px_rgba(0,0,0,0.02)] no-print overflow-x-auto hide-scrollbar"
-      >
-        {[
-          { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
-          { id: "pacientes", label: "Pacientes", icon: Users },
-          { id: "agenda", label: "Agenda", icon: Calendar },
-          { id: "bolsa-empleo", label: "Empleos", icon: Briefcase },
-          { id: "dentalstories", label: "Stories", icon: MessageSquare },
-          { id: "tienda", label: "Mercado", icon: ShoppingBag },
-          { id: "ajustes", label: "Ajustes", icon: Settings }
-        ].map((item) => {
-          const ActiveIcon = item.icon;
-          const isActive = activeTab === item.id;
-          const isNeon = item.id === "dentalstories" || item.id === "tienda" || item.id === "bolsa-empleo";
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (item.id === "pacientes") {
-                  setActivePatientId("");
-                }
-                setActiveTab(item.id as ActiveTab);
-              }}
-              className={`flex flex-col items-center justify-center min-w-[50px] flex-1 gap-1 transition-all duration-200 shrink-0 ${
-                isActive 
-                  ? isNeon 
-                    ? "text-teal-500 scale-[1.04]"
-                    : "text-teal-600 dark:text-teal-400 scale-[1.02]" 
-                  : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-              }`}
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
+              className="text-teal-600 dark:text-teal-400 p-2 border border-slate-200/60 dark:border-slate-800 rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-800/60 hover:bg-teal-50 dark:hover:bg-teal-950/20"
+              title="Buscador rápido (Ctrl+K)"
             >
-              <div className={`relative flex items-center justify-center p-1.5 rounded-xl transition-colors ${isActive && !isNeon ? 'bg-teal-50 dark:bg-teal-900/40' : 'bg-transparent'} ${isNeon ? "w-8 h-8 rounded-lg overflow-visible neon-intense-glow" : ""}`}>
-                {isNeon && (
-                   <>
-                      <div className="absolute inset-x-0 inset-y-0 rounded-lg overflow-hidden -m-0.5">
-                        <div className="absolute inset-0 neon-rainbow-bg pointer-events-none opacity-90" />
-                        <div className={`absolute inset-[1.5px] rounded-[7px] z-0 pointer-events-none transition-colors ${isActive ? 'bg-teal-950/20' : 'dark:bg-slate-900 bg-white'}`} />
-                      </div>
-                   </>
-                )}
-                <ActiveIcon className={`w-5 h-5 relative z-10 transition-colors ${isActive && !isNeon ? 'stroke-[2.5px] text-teal-600 dark:text-teal-400' : isActive && isNeon ? 'text-white' : isNeon ? 'text-slate-650 dark:text-slate-200' : 'stroke-2 text-slate-400'}`} />
-              </div>
-              <span className={`text-[9px] font-medium tracking-tight ${isActive ? "font-bold text-teal-600 dark:text-teal-400" : "text-slate-400"}`}>
-                {item.label}
-              </span>
+              <Search className="w-4 h-4" />
             </button>
-          );
-        })}
-      </nav>
+
+            <button 
+              onClick={() => setDarkMode(!darkMode)}
+              className="text-slate-500 dark:text-slate-300 p-2 border border-slate-200/60 dark:border-slate-800 rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-800/60"
+              title="Cambiar tema"
+            >
+              {darkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+            </button>
+          </div>
+        </header>
+
+        {/* DESKTOP TOP HEADER */}
+        <header className="hidden md:flex w-full bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-b border-slate-100 dark:border-slate-800/30 px-8 py-4 justify-between items-center z-20 sticky top-0 no-print">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-teal-600 dark:text-teal-400 font-extrabold uppercase tracking-wider">PerioDash</span>
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <span className="text-slate-700 dark:text-slate-200 font-bold capitalize">
+              {activeTab === "clinica" ? "Estación Clínica" : activeTab === "pacientes" ? "Expedientes" : activeTab === "agenda" ? "Agenda Médica" : activeTab === "flujo" ? "Flujo & Sillones" : activeTab === "finanzas" ? "Plan & Finanzas" : activeTab}
+            </span>
+            {activeTab === "clinica" && (
+              <>
+                <span className="text-slate-300 dark:text-slate-700">/</span>
+                <span className="text-teal-600 dark:text-teal-400 font-bold capitalize">
+                  {clinicalSubView}
+                </span>
+              </>
+            )}
+            {activePatient && (
+              <>
+                <span className="text-slate-300 dark:text-slate-700">/</span>
+                <span className="text-slate-500 dark:text-slate-400 font-medium truncate max-w-[160px]">
+                  {activePatient.name}
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Quick Search */}
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-50/50 hover:bg-slate-100/80 dark:bg-slate-850/40 dark:hover:bg-slate-800/80 border border-slate-100 dark:border-slate-800/50 text-slate-450 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all cursor-pointer"
+              title="Buscador rápido"
+            >
+              <Search className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span className="text-[11px] font-medium">Buscador</span>
+              <kbd className="text-[9px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-500 rounded px-1 py-0.5 tracking-tight font-mono font-bold ml-1.5">
+                Ctrl+K
+              </kbd>
+            </button>
+
+            {/* Centro de Éxito button */}
+            <button 
+              onClick={() => setShowHelpPanel(true)}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 hover:from-teal-500/20 hover:to-emerald-500/20 border border-teal-500/20 text-teal-700 dark:text-teal-300 rounded-xl transition-all cursor-pointer group"
+              title="Centro de Éxito Clínico"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-teal-500 group-hover:animate-bounce" />
+              <span className="text-[11px] font-bold">Guía Clínica</span>
+              {learningMode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" />
+              )}
+            </button>
+
+            {/* Theme Toggle */}
+            <button 
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 border border-slate-100 dark:border-slate-800/50 rounded-xl cursor-pointer bg-slate-50/30 dark:bg-slate-850/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-500 dark:text-slate-300 transition-all"
+              title="Cambiar apariencia"
+            >
+              {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-indigo-750" />}
+            </button>
+          </div>
+        </header>
+
+        {/* VIEWPORT AREA CONTENT */}
+        <main className="flex-1 w-full p-4 md:p-8 space-y-6 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-8 relative z-0 print:p-0 print:m-0 print:overflow-visible">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.1, ease: "easeOut" }}
+            >
+              <Suspense fallback={<ClinicalViewSkeleton />}>
+                {renderTabContent()}
+              </Suspense>
+            </motion.div>
+          </AnimatePresence>
+        </main>
+
+      {/* Main content closing */}
+    </div>
+
 
       {/* FLOATING CHATBOT ENGINE */}
       <DentitoChat 
@@ -1989,53 +1954,104 @@ export default function App() {
         }} 
       />
 
-      <AnimatePresence>
-        {showShareModal && activePatient && (
-          <SharePatientModal patient={activePatient} onClose={() => setShowShareModal(false)} />
-        )}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {showShareModal && activePatient && (
+            <SharePatientModal patient={activePatient} onClose={() => setShowShareModal(false)} />
+          )}
 
-        {deletingPatientId && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[260] flex items-center justify-center p-4"
-          >
+          {deletingPatientId && (
             <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[260] flex items-center justify-center p-4"
             >
-              <div className="space-y-4">
-                <div className="w-12 h-12 bg-red-500/10 text-red-650 dark:text-red-400 rounded-2xl flex items-center justify-center border border-red-500/20 animate-pulse">
-                  <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <motion.div
+                initial={{ scale: 0.95, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 15 }}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative"
+              >
+                <div className="space-y-4">
+                  <div className="w-12 h-12 bg-red-500/10 text-red-650 dark:text-red-400 rounded-2xl flex items-center justify-center border border-red-500/20 animate-pulse">
+                    <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-base text-[#09090b] dark:text-white">¿Purgar Expediente Clínico?</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                      ¿Estás seguro de que deseas eliminar permanentemente a <strong className="text-slate-900 dark:text-teal-400 font-bold">{patients.find(p => p.id === deletingPatientId)?.name || "este paciente"}</strong> y todos sus registros clínicos, periodontogramas e historiales? Esta operación es irreversible.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => executeDeletePatient(deletingPatientId)}
+                      className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs py-3 rounded-xl transition-all cursor-pointer active:scale-95 text-center"
+                    >
+                      Sí, eliminar
+                    </button>
+                    <button
+                      onClick={() => setDeletingPatientId(null)}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700/60 active:scale-95 text-center"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-display font-black text-base text-[#09090b] dark:text-white">¿Purgar Expediente Clínico?</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                    ¿Estás seguro de que deseas eliminar permanentemente a <strong className="text-slate-900 dark:text-teal-400 font-bold">{patients.find(p => p.id === deletingPatientId)?.name || "este paciente"}</strong> y todos sus registros clínicos, periodontogramas e historiales? Esta operación es irreversible.
-                  </p>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => executeDeletePatient(deletingPatientId)}
-                    className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs py-3 rounded-xl transition-all cursor-pointer active:scale-95 text-center"
-                  >
-                    Sí, eliminar
-                  </button>
-                  <button
-                    onClick={() => setDeletingPatientId(null)}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700/60 active:scale-95 text-center"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+
+        {/* Global Keyboard Shortcuts Modal */}
+        <KeyboardShortcutsModal
+          isOpen={showShortcutsModal}
+          onClose={() => setShowShortcutsModal(false)}
+        />
+      </Suspense>
+
+      {/* Mobile Bottom Dock Bar */}
+      <MobileBottomDock
+        activePatient={activePatient}
+        activeTab={activeTab}
+        onNavigate={(tab, subView) => {
+          setActiveTab(tab as any);
+          if (subView) setClinicalSubView(subView as any);
+        }}
+        onToggleVoice={() => window.dispatchEvent(new CustomEvent('periodash-open-dentito'))}
+        onOpenNewAppointment={() => setActiveTab('agenda')}
+        onOpenNewPatient={() => setShowRegisterForm(true)}
+        onOpenMenu={() => setIsMobileDrawerOpen(true)}
+      />
+
+      {/* Mobile Full Navigation Drawer */}
+      <MobileNavigationDrawer
+        isOpen={isMobileDrawerOpen}
+        onClose={() => setIsMobileDrawerOpen(false)}
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          if (tab === "pacientes") {
+            setActivePatientId("");
+          }
+          setActiveTab(tab);
+        }}
+        clinicalSubView={clinicalSubView}
+        onSelectClinicalSubView={(sub) => {
+          setActiveTab("clinica");
+          setClinicalSubView(sub);
+        }}
+        doctorName={doctorName}
+        clinicName={clinicName}
+        activePatientName={activePatient?.name}
+        darkMode={darkMode}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
+        onOpenSearch={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
+        onOpenHelp={() => setShowHelpPanel(true)}
+        onOpenNewPatient={() => setShowRegisterForm(true)}
+        onOpenNewAppointment={() => setActiveTab('agenda')}
+        onLogout={handleLogout}
+      />
+
     </div>
   );
 }

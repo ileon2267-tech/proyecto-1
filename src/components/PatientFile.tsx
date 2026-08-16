@@ -284,8 +284,216 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -5 }}
-      className="w-full text-slate-800 dark:text-slate-200"
+      className="w-full text-slate-800 dark:text-slate-200 overflow-hidden rounded-2xl"
     >
+      {/* Real-time Clinical Flow & Chair Tracker Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-teal-950 text-white p-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
+            <User className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-300">Trazabilidad Clínica en Tiempo Real:</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold uppercase border ${
+                patient.flowStatus === 'en_sillon' 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 animate-pulse'
+                  : patient.flowStatus === 'espera'
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                  : patient.flowStatus === 'atendido'
+                  ? 'bg-sky-500/20 border-sky-500/40 text-sky-300'
+                  : patient.flowStatus === 'completado'
+                  ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
+                  : patient.flowStatus === 'ausente'
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                  : 'bg-slate-700/50 border-slate-600 text-slate-300'
+              }`}>
+                {patient.flowStatus === 'en_sillon' ? `🟢 En Sillón (${patient.chairAssigned || 'Sillón 1'})`
+                 : patient.flowStatus === 'espera' ? `🟡 En Sala de Espera (${patient.checkInTime ? `Llegó ${patient.checkInTime}` : 'En Recepción'})`
+                 : patient.flowStatus === 'atendido' ? '🔵 Atendido / En Salida'
+                 : patient.flowStatus === 'completado' ? '✅ Consulta Finalizada'
+                 : patient.flowStatus === 'ausente' ? '🔴 Ausente'
+                 : '⚪ Programado en Agenda'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Actualizar ubicación física del paciente para informar a recepción y equipo clínico
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Flow Transition Action Buttons */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              onUpdatePatient({
+                ...patient,
+                flowStatus: 'espera',
+                checkInTime: patient.checkInTime || now,
+                statusUpdatedAt: now
+              });
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              patient.flowStatus === 'espera' 
+                ? 'bg-amber-500 text-slate-950 font-black border-amber-400 shadow-sm' 
+                : 'bg-slate-800/80 hover:bg-slate-700 text-amber-300 border-amber-500/30'
+            }`}
+          >
+            🟡 LLegó / En Espera
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              onUpdatePatient({
+                ...patient,
+                flowStatus: 'en_sillon',
+                chairAssigned: patient.chairAssigned || 'Sillón 1',
+                statusUpdatedAt: now
+              });
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              patient.flowStatus === 'en_sillon' 
+                ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400 shadow-sm' 
+                : 'bg-slate-800/80 hover:bg-slate-700 text-emerald-300 border-emerald-500/30'
+            }`}
+          >
+            🟢 Pasar a Sillón
+          </button>
+
+          {patient.flowStatus === 'en_sillon' && (
+            <select
+              value={patient.chairAssigned || 'Sillón 1'}
+              onChange={(e) => {
+                onUpdatePatient({
+                  ...patient,
+                  chairAssigned: e.target.value
+                });
+              }}
+              className="text-xs bg-slate-800 border border-teal-500/40 text-teal-200 rounded-xl px-2 py-1 font-bold outline-none cursor-pointer"
+            >
+              <option value="Sillón 1">Sillón 1</option>
+              <option value="Sillón 2">Sillón 2</option>
+              <option value="Sillón 3">Sillón 3</option>
+              <option value="Gabinete Quirúrgico">Gabinete Quirúrgico</option>
+            </select>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              onUpdatePatient({
+                ...patient,
+                flowStatus: 'atendido',
+                statusUpdatedAt: now
+              });
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              patient.flowStatus === 'atendido' 
+                ? 'bg-sky-500 text-slate-950 font-black border-sky-400 shadow-sm' 
+                : 'bg-slate-800/80 hover:bg-slate-700 text-sky-300 border-sky-500/30'
+            }`}
+          >
+            🔵 Atendido / Salida
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              onUpdatePatient({
+                ...patient,
+                flowStatus: 'completado',
+                statusUpdatedAt: now
+              });
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              patient.flowStatus === 'completado' 
+                ? 'bg-teal-500 text-slate-950 font-black border-teal-400 shadow-sm' 
+                : 'bg-slate-800/80 hover:bg-slate-700 text-teal-300 border-teal-500/30'
+            }`}
+          >
+            ✅ Concluido
+          </button>
+        </div>
+      </div>
+
+      {/* Patient Lifecycle Status & Staging Bar */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 rounded-t-none flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Estado Clínico:</span>
+          
+          {[
+            { id: 'evaluacion', label: 'Evaluación', color: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300' },
+            { id: 'en_tratamiento', label: 'En Tratamiento', color: 'bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300' },
+            { id: 'mantenimiento', label: 'Mantenimiento', color: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300' },
+            { id: 'alta', label: 'Alta Clínica', color: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300' },
+            { id: 'inactivo', label: 'Inactivo', color: 'bg-slate-500/10 text-slate-600 dark:bg-slate-500/20 dark:text-slate-400' },
+          ].map(st => {
+            const isSelected = (patient.status || 'en_tratamiento') === st.id;
+            return (
+              <button
+                key={st.id}
+                onClick={() => {
+                  onUpdatePatient({
+                    ...patient,
+                    status: st.id as any
+                  });
+                }}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isSelected ? `${st.color} ring-2 ring-teal-500/50 scale-105 shadow-xs` : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {st.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* AAP 2018 Staging Selector */}
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+          <span className="text-xs font-bold text-teal-600 dark:text-teal-400">AAP 2018:</span>
+          <select
+            value={patient.periodontalRisk?.stage || 'II'}
+            onChange={(e) => {
+              const currentRisk = patient.periodontalRisk || { stage: 'II', grade: 'B', riskLevel: 'medio' };
+              onUpdatePatient({
+                ...patient,
+                periodontalRisk: { ...currentRisk, stage: e.target.value as any }
+              });
+            }}
+            className="text-xs font-bold bg-transparent border-0 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+          >
+            <option value="I">Estadio I (Incipiente)</option>
+            <option value="II">Estadio II (Moderado)</option>
+            <option value="III">Estadio III (Severo)</option>
+            <option value="IV">Estadio IV (Avanzado)</option>
+          </select>
+
+          <span className="text-slate-300 dark:text-slate-700">|</span>
+
+          <select
+            value={patient.periodontalRisk?.grade || 'B'}
+            onChange={(e) => {
+              const currentRisk = patient.periodontalRisk || { stage: 'II', grade: 'B', riskLevel: 'medio' };
+              onUpdatePatient({
+                ...patient,
+                periodontalRisk: { ...currentRisk, grade: e.target.value as any }
+              });
+            }}
+            className="text-xs font-bold bg-transparent border-0 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+          >
+            <option value="A">Grado A (Progresión Lenta)</option>
+            <option value="B">Grado B (Moderada)</option>
+            <option value="C">Grado C (Rápida / Fuma/Diab.)</option>
+          </select>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl px-4 sm:px-6 pt-2 overflow-x-auto hide-scrollbar whitespace-nowrap">
         <button
@@ -342,7 +550,8 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
                 {[
                   { id: 'motivo', label: 'Motivo de Consulta', icon: FileText, desc: 'Dolor y motivo principal' },
                   { id: 'sistemico', label: 'Historial Sistémico', icon: HeartPulse, desc: 'Alergias, diabetes, HTA' },
-                  { id: 'especializacion', label: 'Cuestionario Clínico', icon: ShieldAlert, desc: 'Especialidades dentales' },
+                  { id: 'bioseguridad', label: 'Bioseguridad y Alertas', icon: ShieldAlert, desc: 'Anticoagulación, INR, MRONJ, PA' },
+                  { id: 'especializacion', label: 'Cuestionario Clínico', icon: Activity, desc: 'Especialidades dentales' },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isActive = expandedSection === item.id;
@@ -370,6 +579,135 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
 
               {/* Content Panels Area */}
               <div className="lg:col-span-3 space-y-6">
+
+                {/* MATRIZ DE BIOSEGURIDAD Y ALERTAS ACTIVAS EN TIEMPO REAL */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-teal-950 text-white rounded-2xl p-5 border border-slate-700/80 shadow-md relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-700/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-teal-500/20 text-teal-300">
+                        <ShieldAlert className="w-5 h-5 text-teal-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                          Matriz de Bioseguridad & Protocolo de Tratamiento Seguro
+                          <span className="text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full border border-teal-500/30">
+                            Multidisciplinar
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-slate-300">Verificación biológica automática de riesgos quirúrgicos y de sedación</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Alert Chips */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {/* Alerta MRONJ / Bifosfonatos */}
+                    {anamnesis.bifosfonatos ? (
+                      <div className="bg-rose-950/80 border border-rose-500/40 p-3 rounded-xl flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-rose-200">🔴 RIESGO MRONJ (OSTEONECROSIS MAXILAR)</div>
+                          <div className="text-[10px] text-rose-300/90 leading-tight mt-0.5">
+                            Paciente en terapia con Bifosfonatos/Denosumab ({anamnesis.viaBifosfonatos === 'intravenoso' ? 'VÍA INTRAVENOSA - ALTO RIESGO' : 'Vía Oral'}). Evitar exodoncias e implantes sin protocolo de suspensión médica previa.
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Alerta Anticoagulación / INR */}
+                    {anamnesis.anticoagulantes ? (
+                      <div className="bg-amber-950/80 border border-amber-500/40 p-3 rounded-xl flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-amber-200">🟠 ALERTA HEMORRÁGICA (INR: {anamnesis.valorINR || 'Sin registrar'})</div>
+                          <div className="text-[10px] text-amber-300/90 leading-tight mt-0.5">
+                            Tratamiento activo con {anamnesis.tipoAnticoagulante || 'Anticoagulante'}. Verificar INR &lt; 3.0 antes de exodoncias o raspado profundo. Preparar hemostáticos locales.
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Alerta Presión Arterial / Vasoconstrictor */}
+                    {(anamnesis.presionSistolica && anamnesis.presionSistolica >= 140) || (anamnesis.presionDiastolica && anamnesis.presionDiastolica >= 90) || anamnesis.hta ? (
+                      <div className="bg-amber-900/60 border border-amber-500/30 p-3 rounded-xl flex items-start gap-2.5">
+                        <HeartPulse className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-amber-200">
+                            🟡 HIPERTENSIÓN Y ANESTESIA ({anamnesis.presionSistolica || 120}/{anamnesis.presionDiastolica || 80} mmHg)
+                          </div>
+                          <div className="text-[10px] text-amber-300/90 leading-tight mt-0.5">
+                            Limitar vasoconstrictor (máx. 2 carpules con Epinefrina 1:100.000) o utilizar Mepivacaína al 3% sin vasoconstrictor si PA &gt; 160/100.
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Alerta Profilaxis Antibiótica */}
+                    {anamnesis.profilaxisAntibiotica ? (
+                      <div className="bg-sky-950/80 border border-sky-500/40 p-3 rounded-xl flex items-start gap-2.5">
+                        <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-sky-200">🔵 PROFILAXIS ANTIBIÓTICA REQUERIDA</div>
+                          <div className="text-[10px] text-sky-300/90 leading-tight mt-0.5">
+                            {anamnesis.razonProfilaxis || 'Prevención de Endocarditis Infecciosa'}. Indicar Amoxicilina 2g V.O. 1 hora antes (o Clindamicina 600mg).
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Alerta Embarazo */}
+                    {anamnesis.embarazo ? (
+                      <div className="bg-purple-950/80 border border-purple-500/40 p-3 rounded-xl flex items-start gap-2.5">
+                        <Sparkles className="w-4 h-4 text-purple-300 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-purple-200">🤰 EMBARAZO (Trimestre: {anamnesis.trimestreEmbarazo || '2do óptimo'})</div>
+                          <div className="text-[10px] text-purple-300/90 leading-tight mt-0.5">
+                            Usar chaleco plomado con collarín tiroideo si se requieren Rx. Fármacos seguros: Paracetamol y Penicilinas. Posición semi-reclinada.
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Alerta Alergias Anestesia / Látex */}
+                    {(anamnesis.alergiaAnestesia && anamnesis.alergiaAnestesia !== 'Ninguna') || anamnesis.alergiaLatex || anamnesis.alergias ? (
+                      <div className="bg-red-950/80 border border-red-500/40 p-3 rounded-xl flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-red-200">🚫 ALERGIAS Y BIOSEGURIDAD EN SILLÓN</div>
+                          <div className="text-[10px] text-red-300/90 leading-tight mt-0.5">
+                            {anamnesis.alergiaAnestesia && anamnesis.alergiaAnestesia !== 'Ninguna' ? `Anestésicos: ${anamnesis.alergiaAnestesia}. ` : ''}
+                            {anamnesis.alergiaLatex ? 'LÁTEX: Usar exclusivamente guantes de Nitrilo. ' : ''}
+                            {anamnesis.alergias}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Biotipo Periodontal Fino */}
+                    {anamnesis.biotipoPeriodontal === 'fino' ? (
+                      <div className="bg-teal-950/80 border border-teal-500/40 p-3 rounded-xl flex items-start gap-2.5">
+                        <ShieldAlert className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-teal-200">📐 BIOTIPO PERIODONTAL FINO (RIESGO TISULAR)</div>
+                          <div className="text-[10px] text-teal-300/90 leading-tight mt-0.5">
+                            Alta vulnerabilidad a recesión gingival y reabsorción del hueso del margen vestibular. Evaluar injerto de tejido conectivo en cirugías/implantes.
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {!anamnesis.bifosfonatos && !anamnesis.anticoagulantes && !anamnesis.profilaxisAntibiotica && !anamnesis.embarazo && (!anamnesis.alergiaAnestesia || anamnesis.alergiaAnestesia === 'Ninguna') && !anamnesis.alergiaLatex && (!anamnesis.presionSistolica || anamnesis.presionSistolica < 140) && (
+                      <div className="col-span-1 md:col-span-2 bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-xl flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-400" />
+                          <span className="text-xs font-bold text-emerald-300">Paciente Apto para Procedimientos Estándar (Sin alertas críticas sistémicas)</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-400/80 font-mono">Signos Vitales Estables</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               {/* SECCION 1: MOTIVO DE CONSULTA Y DOLOR */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <ToggleHeader id="motivo" icon={FileText} title="Motivo de Consulta" description="Razón principal de la visita y evaluación del dolor actual" expandedSection={expandedSection} setExpandedSection={setExpandedSection} />
@@ -500,6 +838,241 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
                             </div>
                           </div>
                         </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* SECCION 3: BIOSEGURIDAD Y PROTOCOLOS DE SEGURIDAD CLÍNICA */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                <ToggleHeader 
+                  id="bioseguridad" 
+                  icon={ShieldAlert} 
+                  title="Bioseguridad y Alertas Clínicas de Seguridad" 
+                  description="Anticoagulación, INR, MRONJ/Bifosfonatos, Signos Vitales, Anestesia y Profilaxis" 
+                  expandedSection={expandedSection} 
+                  setExpandedSection={setExpandedSection} 
+                />
+                <AnimatePresence initial={false}>
+                  {expandedSection === 'bioseguridad' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/40 space-y-6">
+                        
+                        {/* BLOQUE 1: SIGNOS VITALES Y ANESTESIA SEGURA */}
+                        <div className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+                          <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                            <HeartPulse className="w-4 h-4" /> Signos Vitales en Sillón & Elección de Anestésico
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Presión Arterial Sistólica (mmHg)</label>
+                              <input 
+                                type="number" 
+                                placeholder="120" 
+                                value={anamnesis.presionSistolica || 120} 
+                                onChange={(e) => setAnamnesis({...anamnesis, presionSistolica: parseInt(e.target.value) || 0})}
+                                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Presión Arterial Diastólica (mmHg)</label>
+                              <input 
+                                type="number" 
+                                placeholder="80" 
+                                value={anamnesis.presionDiastolica || 80} 
+                                onChange={(e) => setAnamnesis({...anamnesis, presionDiastolica: parseInt(e.target.value) || 0})}
+                                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alergia a Anestésicos Locales</label>
+                              <select 
+                                value={anamnesis.alergiaAnestesia || "Ninguna"} 
+                                onChange={(e) => setAnamnesis({...anamnesis, alergiaAnestesia: e.target.value})}
+                                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 font-medium"
+                              >
+                                <option value="Ninguna">Sin alergias anestésicas conocidas</option>
+                                <option value="Lidocaína">Alergia declarada a Lidocaína</option>
+                                <option value="Articaína">Alergia declarada a Articaína</option>
+                                <option value="Mepivacaína">Alergia declarada a Mepivacaína</option>
+                                <option value="Bisulfito de Sodio">Alergia a Bisulfito / Sulfito (Conservante Epinefrina)</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          {/* Recomendación Anestésica en Tiempo Real */}
+                          <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                            (anamnesis.presionSistolica && anamnesis.presionSistolica >= 140) || (anamnesis.presionDiastolica && anamnesis.presionDiastolica >= 90)
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
+                              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                          }`}>
+                            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block">
+                                {(anamnesis.presionSistolica && anamnesis.presionSistolica >= 140) || (anamnesis.presionDiastolica && anamnesis.presionDiastolica >= 90)
+                                  ? '⚠️ Alerta de Vasoconstrictor Anestésico:'
+                                  : '✓ Protocolo Anestésico Estándar Seguro:'}
+                              </span>
+                              {(anamnesis.presionSistolica && anamnesis.presionSistolica >= 140) || (anamnesis.presionDiastolica && anamnesis.presionDiastolica >= 90)
+                                ? 'Presión arterial en estadio elevado. Se aconseja utilizar Mepivacaína al 3% sin vasoconstrictor o limitar la anestesia con Epinefrina 1:100.000 a un máximo estricto de 2 carpules.'
+                                : 'Presión arterial dentro de parámetros normales. Se permite el uso de Lidocaína o Articaína con Epinefrina 1:100.000 bajo aspiración previa rutinaria.'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* BLOQUE 2: COAGULACIÓN, ANTICOAGULANTES E INR */}
+                        <div className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+                          <div className="flex items-center gap-2 text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                            <Activity className="w-4 h-4" /> Control de Hemostasia y Terapia Anticoagulante
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                              <input 
+                                type="checkbox" 
+                                checked={anamnesis.anticoagulantes || false} 
+                                onChange={(e) => setAnamnesis({...anamnesis, anticoagulantes: e.target.checked})} 
+                                className="w-4 h-4 text-rose-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-rose-500 focus:ring-2" 
+                              />
+                              <div>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">¿Tratamiento Anticoagulante Activo?</span>
+                                <span className="text-[10px] text-slate-400">Aspirina, Warfarina, Rivaroxabán, Apixabán, etc.</span>
+                              </div>
+                            </label>
+
+                            {anamnesis.anticoagulantes && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tipo de Anticoagulante</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="Ej. Warfarina / Rivaroxabán 20mg / Aspirina 100mg" 
+                                    value={anamnesis.tipoAnticoagulante || ""} 
+                                    onChange={(e) => setAnamnesis({...anamnesis, tipoAnticoagulante: e.target.value})}
+                                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-rose-500/20"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Valor INR Reciente (Laboratorio)</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="Ej. 2.1 (Aceptable si < 3.0)" 
+                                    value={anamnesis.valorINR || ""} 
+                                    onChange={(e) => setAnamnesis({...anamnesis, valorINR: e.target.value})}
+                                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-rose-500/20 font-mono font-bold"
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* BLOQUE 3: OSTEONECROSIS Y BIFOSFONATOS (MRONJ) */}
+                        <div className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+                          <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                            <ShieldAlert className="w-4 h-4" /> Prevención de Osteonecrosis Maxilar (MRONJ)
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                              <input 
+                                type="checkbox" 
+                                checked={anamnesis.bifosfonatos || false} 
+                                onChange={(e) => setAnamnesis({...anamnesis, bifosfonatos: e.target.checked})} 
+                                className="w-4 h-4 text-purple-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-purple-500 focus:ring-2" 
+                              />
+                              <div>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">¿Uso de Bifosfonatos o Denosumab?</span>
+                                <span className="text-[10px] text-slate-400">Tratamiento para Osteoporosis o Metástasis Ósea</span>
+                              </div>
+                            </label>
+
+                            {anamnesis.bifosfonatos && (
+                              <div>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Vía de Administración</label>
+                                <select 
+                                  value={anamnesis.viaBifosfonatos || "oral"} 
+                                  onChange={(e) => setAnamnesis({...anamnesis, viaBifosfonatos: e.target.value as any})}
+                                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-purple-500/20 font-bold text-purple-700 dark:text-purple-300"
+                                >
+                                  <option value="oral">Vía Oral (Alendronato, Ibandronato - Riesgo Moderado)</option>
+                                  <option value="intravenoso">Vía Intravenosa (Ácido Zoledrónico, Denosumab - RIESGO ALTO MRONJ)</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* BLOQUE 4: PROFILAXIS ANTIBIÓTICA Y EMBARAZO */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Profilaxis */}
+                          <div className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-3">
+                            <div className="flex items-center gap-2 text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                              <Info className="w-4 h-4" /> Profilaxis Antibiótica Pre-Procedimiento
+                            </div>
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                              <input 
+                                type="checkbox" 
+                                checked={anamnesis.profilaxisAntibiotica || false} 
+                                onChange={(e) => setAnamnesis({...anamnesis, profilaxisAntibiotica: e.target.checked})} 
+                                className="w-4 h-4 text-sky-600 rounded dark:bg-slate-700 dark:border-slate-600 focus:ring-sky-500 focus:ring-2" 
+                              />
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Requiere Profilaxis Antibiótica Previa</span>
+                            </label>
+                            {anamnesis.profilaxisAntibiotica && (
+                              <input 
+                                type="text" 
+                                placeholder="Causa: Ej. Prótesis valvular, soplo, prótesis de cadera" 
+                                value={anamnesis.razonProfilaxis || ""} 
+                                onChange={(e) => setAnamnesis({...anamnesis, razonProfilaxis: e.target.value})}
+                                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-sky-500/20"
+                              />
+                            )}
+                          </div>
+
+                          {/* Embarazo & Biotipo */}
+                          <div className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-3">
+                            <div className="flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                              <ShieldAlert className="w-4 h-4" /> Embarazo & Biotipo Periodontal
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Embarazo Activo</label>
+                                <select 
+                                  value={anamnesis.embarazo ? (anamnesis.trimestreEmbarazo || "2do") : "no"} 
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "no") {
+                                      setAnamnesis({...anamnesis, embarazo: false, trimestreEmbarazo: undefined});
+                                    } else {
+                                      setAnamnesis({...anamnesis, embarazo: true, trimestreEmbarazo: val as any});
+                                    }
+                                  }}
+                                  className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none"
+                                >
+                                  <option value="no">No embarazada</option>
+                                  <option value="1er">1er Trimestre</option>
+                                  <option value="2do">2do Trimestre (Óptimo)</option>
+                                  <option value="3er">3er Trimestre</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Biotipo Periodontal</label>
+                                <select 
+                                  value={anamnesis.biotipoPeriodontal || "medio"} 
+                                  onChange={(e) => setAnamnesis({...anamnesis, biotipoPeriodontal: e.target.value as any})}
+                                  className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none font-bold"
+                                >
+                                  <option value="fino">Fino (Alto riesgo recesión)</option>
+                                  <option value="medio">Medio (Resistencia media)</option>
+                                  <option value="grueso">Grueso (Poco proclive recesión)</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                       </div>
                     </motion.div>
                   )}

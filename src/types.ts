@@ -51,6 +51,22 @@ export interface Anamnesis {
   dolorActual: "ninguno" | "leve" | "pulsatil" | "agudo";
   notasSistemicas: string;
   edadSimulada?: number;
+
+  // Parámetros Críticos de Seguridad Clínica y Bioseguridad Multidisciplinaria
+  anticoagulantes?: boolean;
+  tipoAnticoagulante?: string; // e.g. "Warfarina", "Sintrom", "Rivaroxabán", "Aspirina"
+  valorINR?: string; // Valor de INR (e.g. "2.3", alerta si > 3.0 para cirugía/sondaje)
+  bifosfonatos?: boolean;
+  viaBifosfonatos?: "oral" | "intravenoso" | "ninguno"; // Alerta Roja de Osteonecrosis (MRONJ)
+  profilaxisAntibiotica?: boolean;
+  razonProfilaxis?: string; // e.g. "Prótesis valvular", "Cardiopatía congénita", "Prótesis articular"
+  presionSistolica?: number; // mmHg (e.g. 120, alerta si >= 140)
+  presionDiastolica?: number; // mmHg (e.g. 80, alerta si >= 90)
+  alergiaAnestesia?: string; // e.g. "Lidocaína", "Articaína", "Epinefrina/Bisulfito", "Ninguna"
+  alergiaLatex?: boolean;
+  embarazo?: boolean;
+  trimestreEmbarazo?: 1 | 2 | 3;
+  biotipoPeriodontal?: "fino" | "medio" | "grueso"; // Para riesgo de recesión e implantes
 }
 
 export interface XRayImage {
@@ -59,6 +75,21 @@ export interface XRayImage {
   date: string;
   type: "panoramica" | "periapical" | "bite-wing";
   notes: string;
+}
+
+export interface InformedConsentRecord {
+  accepted: boolean;
+  acceptedAt: string;
+  patientName?: string;
+  patientDocumentId?: string;
+  signatureDataUrl?: string; // Digital signature canvas URL
+  photoEvidenceUrl?: string; // Camera snapshot or file upload
+  verificationMethod: 'signature' | 'camera' | 'both' | 'mobile_qr';
+  notes?: string;
+  templateCategory?: string;
+  customClauses?: string;
+  customRisks?: string;
+  shareToken?: string;
 }
 
 export interface TreatmentProcedure {
@@ -70,6 +101,7 @@ export interface TreatmentProcedure {
   tooth?: string; // e.g. "1.4" or "Arcada Superior"
   surface?: string; // e.g. "Mesial", "Vestibular", "Todas"
   discount?: number; // percentage
+  informedConsent?: InformedConsentRecord;
 }
 
 export interface TreatmentPlan {
@@ -95,16 +127,60 @@ export interface Consentimiento {
   signature: string | null; // null if not signed
 }
 
+export interface PeriodontogramVisit {
+  id: string;
+  date: string;
+  title: string;
+  oLearyScore: number;
+  bopScore: number; // Bleeding on Probing %
+  meanPocketDepth: number; // Average sondaje in mm
+  notes?: string;
+  periodontogram: Record<number, PeriodonState>;
+}
+
+export type PatientStatus = 'evaluacion' | 'en_tratamiento' | 'mantenimiento' | 'alta' | 'inactivo';
+
+export type ClinicalFlowStatus = 'programado' | 'espera' | 'en_sillon' | 'atendido' | 'completado' | 'ausente' | 'cancelado';
+
+export interface PeriodontalRisk {
+  stage: 'I' | 'II' | 'III' | 'IV';
+  grade: 'A' | 'B' | 'C';
+  riskLevel: 'bajo' | 'medio' | 'alto';
+}
+
+export interface CustomSpecialtyMarker {
+  id: string;
+  specialty: string; // 'endodoncia' | 'ortodoncia' | 'odontopediatria' | 'cirugia' | 'estetica' | 'periodoncia'
+  title: string;
+  toothNumber?: number;
+  severityLevel: 'normal' | 'leve' | 'moderado' | 'severo' | 'critico';
+  color: string; // Tailwind color token or hex
+  scoreValue?: number;
+  scaleMax?: number;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Patient {
   id: string;
   name: string;
+  rut?: string;
+  dni?: string;
   phone: string;
   email: string;
   notes: string;
   birthdate: string;
   createdAt: string;
+  status?: PatientStatus;
+  flowStatus?: ClinicalFlowStatus;
+  chairAssigned?: string; // e.g. "Sillón 1", "Sillón 2", "Gabinete Quirúrgico"
+  checkInTime?: string; // e.g. "15:10"
+  statusUpdatedAt?: string;
+  periodontalRisk?: PeriodontalRisk;
+  lastVisitDate?: string;
   odontogram: Record<number, ToothState>;
   periodontogram: Record<number, PeriodonState>;
+  periodontogramHistory?: PeriodontogramVisit[];
   oLeary: Record<number, OLearyState>;
   anamnesis: Anamnesis;
   xRays: XRayImage[];
@@ -113,6 +189,7 @@ export interface Patient {
   consentimientos?: Consentimiento[];
   activeSpecialty?: string;
   specialtyData?: Record<string, any>;
+  customSpecialtyMarkers?: CustomSpecialtyMarker[];
 }
 
 export interface Appointment {
@@ -123,6 +200,7 @@ export interface Appointment {
   time: string; // HH:MM
   treatment: string;
   status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
+  flowStatus?: ClinicalFlowStatus;
   box?: string; // e.g., "Sillón 1", "Sillón 2", "Sillón 3"
 }
 

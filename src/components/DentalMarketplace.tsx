@@ -444,7 +444,7 @@ export default function DentalMarketplace() {
             placeholder="Buscar por marca, instrumental o insumo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/25 duration-150 text-slate-800 dark:text-slate-200 shadow-xs"
+            className="w-full text-xs pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/25 duration-150 text-slate-800 dark:text-slate-200 shadow-xs"
           />
         </div>
 
@@ -454,7 +454,7 @@ export default function DentalMarketplace() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full text-xs p-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-teal-500/20"
+            className="w-full text-xs p-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-teal-500/20"
           >
             {categories.map(c => (
               <option key={c} value={c}>{c === "Todos" ? "Todas las Categorías" : c}</option>
@@ -467,7 +467,7 @@ export default function DentalMarketplace() {
           <select
             value={selectedCondition}
             onChange={(e) => setSelectedCondition(e.target.value)}
-            className="w-full text-xs p-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-teal-500/20"
+            className="w-full text-xs p-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-teal-500/20"
           >
             {conditions.map(cond => (
               <option key={cond} value={cond}>{cond === "Todos" ? "Cualquier Estado" : cond}</option>
@@ -480,7 +480,7 @@ export default function DentalMarketplace() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full text-xs p-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-teal-500/20"
+            className="w-full text-xs p-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-teal-500/20"
           >
             <option value="newest">Más Recientes</option>
             <option value="price_asc">Precio: Bajo a Alto</option>
@@ -582,7 +582,7 @@ export default function DentalMarketplace() {
                     <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest leading-none">
                       {item.category}
                     </span>
-                    <span className="font-medium text-slate-450 dark:text-slate-500 font-mono inline-flex items-center gap-1 leading-none">
+                    <span className="font-medium text-slate-400 dark:text-slate-500 font-mono inline-flex items-center gap-1 leading-none">
                       <Clock className="w-3.5 h-3.5" />
                       {item.createdAt}
                     </span>
@@ -590,7 +590,7 @@ export default function DentalMarketplace() {
 
                   {/* Main title */}
                   <div className="space-y-1">
-                    <h3 className="font-display font-extrabold text-sm text-slate-850 dark:text-slate-100 leading-snug group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors duration-150 line-clamp-1">
+                    <h3 className="font-display font-extrabold text-sm text-slate-800 dark:text-slate-100 leading-snug group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors duration-150 line-clamp-1">
                       {item.title}
                     </h3>
                   </div>
@@ -602,7 +602,7 @@ export default function DentalMarketplace() {
 
                   {/* Seller and Location summary */}
                   <div className="pt-3 border-t border-slate-50 dark:border-slate-800/80 space-y-1.5 text-[11px]">
-                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-350">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-300">
                       <div className="w-4 h-4 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full flex items-center justify-center font-extrabold text-[8px] border border-slate-200 dark:border-slate-700 select-none">
                         {item.sellerName.charAt(0)}
                       </div>
@@ -651,7 +651,7 @@ export default function DentalMarketplace() {
 
         {sortedAndFilteredListings.length === 0 && (
           <div className="col-span-full bg-slate-50 dark:bg-slate-800/40 py-20 text-center border-2 border-dashed border-slate-200 dark:border-slate-800/80 rounded-2xl space-y-4">
-            <ShoppingBag className="w-12 h-12 text-slate-350 dark:text-slate-650 mx-auto animate-pulse" />
+            <ShoppingBag className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto animate-pulse" />
             <div className="space-y-1">
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-300">No se encontraron productos</h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto font-light">Prueba ajustando los filtros de búsqueda o alternando las pestañas superior.</p>
@@ -674,11 +674,11 @@ export default function DentalMarketplace() {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-6 rounded-2xl w-full max-w-2xl max-h-[90svh] overflow-y-auto shadow-2xl relative block"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl w-full max-w-2xl max-h-[90svh] overflow-y-auto shadow-2xl relative block"
             >
               <button
                 onClick={() => setShowAddModal(false)}
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-100 bg-slate-50 dark:bg-slate-800 hover:bg-slate-150 dark:hover:bg-slate-750 rounded-xl cursor-pointer transition-all duration-150"
+                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-100 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 rounded-xl cursor-pointer transition-all duration-150"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -770,7 +770,7 @@ export default function DentalMarketplace() {
                   {/* Seller Details Info */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-3 md:space-y-0">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] text-slate-450 dark:text-slate-400 font-bold uppercase tracking-wider block">Tu Nombre de Contacto:</label>
+                      <label className="text-[9px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider block">Tu Nombre de Contacto:</label>
                       <input
                         type="text"
                         value={newSellerName}
@@ -780,7 +780,7 @@ export default function DentalMarketplace() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] text-slate-450 dark:text-slate-400 font-bold uppercase tracking-wider block">WhatsApp / Teléfono:</label>
+                      <label className="text-[9px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider block">WhatsApp / Teléfono:</label>
                       <input
                         type="text"
                         value={newSellerPhone}
@@ -790,7 +790,7 @@ export default function DentalMarketplace() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] text-slate-450 dark:text-slate-400 font-bold uppercase tracking-wider block">Ubicación / Región:</label>
+                      <label className="text-[9px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider block">Ubicación / Región:</label>
                       <input
                         type="text"
                         value={newLocation}
@@ -814,7 +814,7 @@ export default function DentalMarketplace() {
                           ? "border-teal-500 bg-teal-500/5 dark:bg-teal-500/10 shadow-[0_0_15px_rgba(20,184,166,0.15)]" 
                           : newImageUrl 
                           ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/5"
-                          : "border-slate-200 dark:border-slate-700 hover:border-slate-350 dark:hover:border-slate-650 bg-slate-50 dark:bg-slate-800/40"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50 dark:bg-slate-800/40"
                       }`}
                     >
                       {newImageUrl ? (
@@ -905,7 +905,7 @@ export default function DentalMarketplace() {
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative"
             >
               <button
                 onClick={() => setActiveContactItem(null)}
@@ -917,11 +917,11 @@ export default function DentalMarketplace() {
               <div className="space-y-4">
                 <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
                   <h3 className="font-display font-black text-base text-slate-800 dark:text-white">Contactar Dentista / Colega</h3>
-                  <p className="text-xs text-slate-450 dark:text-slate-400">Ponte en contacto directo para acordar pago o programar entrega física del material.</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-400">Ponte en contacto directo para acordar pago o programar entrega física del material.</p>
                 </div>
 
                 {/* Listing Summary Row */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-850 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center gap-3">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center gap-3">
                   <div className="w-10 h-10 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center font-black text-lg">
                     {activeContactItem.title.charAt(0)}
                   </div>
@@ -963,7 +963,7 @@ export default function DentalMarketplace() {
                 <div className="pt-2 flex flex-col sm:flex-row gap-2">
                   <a 
                     href={`mailto:${activeContactItem.sellerEmail}?subject=Interés en ${encodeURIComponent(activeContactItem.title)}&body=${encodeURIComponent(contactMessage)}`}
-                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-150 font-bold text-xs rounded-xl cursor-pointer text-center duration-150 inline-flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl cursor-pointer text-center duration-150 inline-flex items-center justify-center gap-1.5"
                   >
                     <Mail className="w-4 h-4" />
                     <span>Enviar Email</span>

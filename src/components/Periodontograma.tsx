@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { PeriodonState, ToothState, Patient } from "../types";
 import { UPPER_TEETH, LOWER_TEETH, ALL_TEETH_NUMBERS } from "../initialData";
 import InteractiveTooth3D from "./InteractiveTooth3D";
+import FastProbingBar from "./FastProbingBar";
+import PeriodontogramComparisonModal from "./PeriodontogramComparisonModal";
 import { 
   Droplet, 
   CircleDot, 
@@ -17,11 +19,17 @@ import {
   Award,
   Settings,
   Mic,
-  MicOff
+  MicOff,
+  History
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
+const ANATOMY_CACHE: Record<string, any> = {};
+
 const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
+  const cacheKey = `${num}-${arch}`;
+  if (ANATOMY_CACHE[cacheKey]) return ANATOMY_CACHE[cacheKey];
+
   const lastDigit = num % 10;
   let family: "molar" | "premolar" | "canine" | "incisor" = "incisor";
   if (lastDigit === 1 || lastDigit === 2) family = "incisor";
@@ -29,10 +37,11 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
   else if (lastDigit === 4 || lastDigit === 5) family = "premolar";
   else family = "molar";
 
+  let result: any;
   if (arch === "upper") {
     switch (family) {
       case "molar":
-        return {
+        result = {
           rootPath: "M 32,80 C 12,42 22,22 28,12 C 34,26 36,46 42,80 C 44,46 47,24 49,8 C 51,24 54,46 56,80 C 58,46 60,26 66,12 C 72,22 82,42 68,80 Z",
           crownPath: "M 32,80 C 21,95 24,125 35,131 Q 50,135 65,131 C 76,125 79,95 68,80 Z",
           dentinPath: "M 35,80 C 23,48 31,30 35,20 C 39,32 40,50 44,80 C 46,50 48,32 50,16 C 52,32 54,50 56,80 C 58,50 59,32 63,20 C 67,30 75,48 65,80 Z",
@@ -40,8 +49,9 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 38,84 C 32,94 34,118 43,123",
           ligamentPath: "M 29,80 C 9,38 19,18 26,8 C 32,24 34,44 41,80 C 43,44 46,22 49,4 C 52,22 55,44 57,80 C 59,44 61,24 67,8 C 74,18 84,38 71,80"
         };
+        break;
       case "premolar":
-        return {
+        result = {
           rootPath: "M 34,80 C 20,40 33,24 36,12 C 39,26 42,46 47,80 C 50,46 53,26 56,12 C 59,24 72,40 64,80 Z",
           crownPath: "M 34,80 C 24,94 28,124 44,128 Q 50,130 56,128 C 72,124 76,94 64,80 Z",
           dentinPath: "M 37,80 C 27,45 36,32 39,20 C 41,32 43,48 48,80 C 50,48 52,32 54,20 C 57,32 66,45 61,80 Z",
@@ -49,8 +59,9 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 39,84 C 33,94 35,118 44,122",
           ligamentPath: "M 31,80 C 17,36 30,20 34,8 C 37,22 40,42 46,80 C 49,42 52,22 55,8 C 58,20 71,36 67,80"
         };
+        break;
       case "canine":
-        return {
+        result = {
           rootPath: "M 35,80 C 23,40 37,16 46,2 C 48,16 62,40 65,80 Z",
           crownPath: "M 35,80 C 25,95 28,120 50,134 C 72,120 75,95 65,80 Z",
           dentinPath: "M 38,80 C 29,45 40,24 47,10 C 49,24 60,45 62,80 Z",
@@ -58,9 +69,10 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 39,84 C 33,94 35,116 44,122",
           ligamentPath: "M 32,80 C 20,36 34,12 45,0 C 47,12 61,36 68,80"
         };
+        break;
       case "incisor":
       default:
-        return {
+        result = {
           rootPath: "M 36,80 C 28,45 40,25 47,8 C 49,25 61,45 64,80 Z",
           crownPath: "M 36,80 C 28,94 30,124 38,128 L 62,128 C 70,124 72,94 64,80 Z",
           dentinPath: "M 39,80 C 33,50 42,32 48,16 C 50,32 59,50 61,80 Z",
@@ -68,11 +80,12 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 40,84 C 34,94 35,118 41,122",
           ligamentPath: "M 33,80 C 25,41 37,21 46,4 C 48,21 60,41 67,80"
         };
+        break;
     }
   } else {
     switch (family) {
       case "molar":
-        return {
+        result = {
           rootPath: "M 32,80 C 12,118 22,138 28,148 C 34,134 36,114 42,80 C 44,114 47,136 49,152 C 51,136 54,114 56,80 C 58,114 60,134 66,148 C 72,138 82,118 68,80 Z",
           crownPath: "M 32,80 C 21,65 24,35 35,29 Q 50,25 65,29 C 76,35 79,65 68,80 Z",
           dentinPath: "M 35,80 C 23,112 31,130 35,140 C 39,128 40,110 44,80 C 46,110 48,128 50,144 C 52,128 54,110 56,80 C 58,110 59,128 63,140 C 67,130 75,112 65,80 Z",
@@ -80,8 +93,9 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 38,76 C 32,66 34,42 43,37",
           ligamentPath: "M 29,80 C 9,122 19,142 26,152 C 32,136 34,116 41,80 C 43,116 46,138 49,156 C 52,138 55,116 57,80 C 59,116 61,136 67,152 C 74,142 84,122 71,80"
         };
+        break;
       case "premolar":
-        return {
+        result = {
           rootPath: "M 34,80 C 20,120 33,136 36,148 C 39,134 42,114 47,80 C 50,114 53,134 56,148 C 59,136 72,120 64,80 Z",
           crownPath: "M 34,80 C 24,66 28,36 44,32 Q 50,30 56,32 C 72,36 76,66 64,80 Z",
           dentinPath: "M 37,80 C 27,115 36,128 39,140 C 41,128 43,112 48,80 C 50,112 52,128 54,140 C 57,128 66,115 61,80 Z",
@@ -89,8 +103,9 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 39,76 C 33,66 35,42 44,38",
           ligamentPath: "M 31,80 C 17,124 30,140 34,152 C 37,138 40,118 46,80 C 49,118 52,138 55,152 C 58,140 71,124 67,80"
         };
+        break;
       case "canine":
-        return {
+        result = {
           rootPath: "M 35,80 C 23,120 37,144 46,158 C 48,144 62,120 65,80 Z",
           crownPath: "M 35,80 C 25,65 28,40 50,26 C 72,40 75,65 65,80 Z",
           dentinPath: "M 38,80 C 29,115 40,136 47,150 C 49,136 60,115 62,80 Z",
@@ -98,9 +113,10 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 39,76 C 33,66 35,44 44,38",
           ligamentPath: "M 32,80 C 20,124 34,148 45,160 C 47,148 61,124 68,80"
         };
+        break;
       case "incisor":
       default:
-        return {
+        result = {
           rootPath: "M 36,80 C 28,115 40,135 47,152 C 49,135 61,115 64,80 Z",
           crownPath: "M 36,80 C 28,66 30,36 38,32 L 62,32 C 70,36 72,66 64,80 Z",
           dentinPath: "M 39,80 C 33,110 42,128 48,144 C 50,128 59,110 61,80 Z",
@@ -108,8 +124,12 @@ const getToothAnatomyPaths = (num: number, arch: "upper" | "lower") => {
           highlightPath: "M 40,76 C 34,66 35,42 41,38",
           ligamentPath: "M 33,80 C 25,119 37,139 46,156 C 48,139 60,119 67,80"
         };
+        break;
     }
   }
+
+  ANATOMY_CACHE[cacheKey] = result;
+  return result;
 };
 
 interface PeriodontogramaProps {
@@ -120,7 +140,7 @@ interface PeriodontogramaProps {
   onUpdatePatient?: (updatedPatient: Patient) => void;
 }
 
-export default function Periodontograma({ periodontogram, onChange, odontogram, patient, onUpdatePatient }: PeriodontogramaProps) {
+function PeriodontogramaComponent({ periodontogram, onChange, odontogram, patient, onUpdatePatient }: PeriodontogramaProps) {
   const [selectedTooth, setSelectedTooth] = useState<number>(16);
   const [activeArch, setActiveArch] = useState<"upper" | "lower">("upper");
 
@@ -132,6 +152,8 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
 
   // Keyboard shortcut assistant
   const [keyboardMode, setKeyboardMode] = useState<boolean>(false);
+  const [isFastProbingActive, setIsFastProbingActive] = useState<boolean>(false);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState<boolean>(false);
   const [inputMetric, setInputMetric] = useState<"pocket" | "recess">("pocket");
   const [inputSurface, setInputSurface] = useState<"vestibular" | "palatino">("vestibular");
   const [inputPosition, setInputPosition] = useState<"mesial" | "central" | "distal">("mesial");
@@ -889,34 +911,60 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
           </p>
         </div>
 
-        {/* Arch Selector Pill */}
-        <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded-xl flex border border-slate-100 dark:border-slate-700/80 shrink-0 select-none">
+        {/* Arch Selector Pill & Quick Action Tools */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => {
-              setActiveArch("upper");
-              setSelectedTooth(16);
-            }}
-            className={`text-xs py-1.5 px-3.5 rounded-lg font-semibold transition-all cursor-pointer ${
-              activeArch === "upper"
-                ? "bg-white dark:bg-slate-900 shadow-xs text-teal-600 dark:text-teal-400"
-                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            onClick={() => setIsFastProbingActive(!isFastProbingActive)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isFastProbingActive
+                ? 'bg-amber-500 text-slate-900 font-bold shadow-md'
+                : 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 hover:bg-amber-500/20'
             }`}
+            title="Activar entrada rápida con teclado numérico"
           >
-            Arcada Superior
+            <Zap className="w-3.5 h-3.5" />
+            Sondaje Rápido
           </button>
-          <button
-            onClick={() => {
-              setActiveArch("lower");
-              setSelectedTooth(46);
-            }}
-            className={`text-xs py-1.5 px-3.5 rounded-lg font-semibold transition-all cursor-pointer ${
-              activeArch === "lower"
-                ? "bg-white dark:bg-slate-900 shadow-xs text-teal-600 dark:text-teal-400"
-                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            }`}
-          >
-            Arcada Inferior
-          </button>
+
+          {patient && (
+            <button
+              onClick={() => setIsComparisonModalOpen(true)}
+              className="px-3 py-1.5 bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300 rounded-xl text-xs font-semibold hover:bg-teal-500/20 transition-all flex items-center gap-1.5"
+              title="Comparar evolución histórica con visitas previas"
+            >
+              <History className="w-3.5 h-3.5" />
+              Comparar Visitas ({patient.periodontogramHistory?.length || 0})
+            </button>
+          )}
+
+          <div className="bg-slate-50 dark:bg-slate-800 p-1 rounded-xl flex border border-slate-100 dark:border-slate-700/80 shrink-0 select-none">
+            <button
+              onClick={() => {
+                setActiveArch("upper");
+                setSelectedTooth(16);
+              }}
+              className={`text-xs py-1.5 px-3.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeArch === "upper"
+                  ? "bg-white dark:bg-slate-900 shadow-xs text-teal-600 dark:text-teal-400"
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              }`}
+            >
+              Arcada Superior
+            </button>
+            <button
+              onClick={() => {
+                setActiveArch("lower");
+                setSelectedTooth(46);
+              }}
+              className={`text-xs py-1.5 px-3.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeArch === "lower"
+                  ? "bg-white dark:bg-slate-900 shadow-xs text-teal-600 dark:text-teal-400"
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              }`}
+            >
+              Arcada Inferior
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2097,6 +2145,43 @@ export default function Periodontograma({ periodontogram, onChange, odontogram, 
         </div>
       </div>
 
+      {/* Fast Probing Keyboard Bar */}
+      <FastProbingBar
+        isActive={isFastProbingActive}
+        onClose={() => setIsFastProbingActive(false)}
+        periodontogram={periodontogram}
+        onUpdatePeriodontogram={onChange}
+      />
+
+      {/* Periodontogram Comparison Modal */}
+      {patient && (
+        <PeriodontogramComparisonModal
+          isOpen={isComparisonModalOpen}
+          onClose={() => setIsComparisonModalOpen(false)}
+          patient={patient}
+          onSaveCurrentSnapshot={(title) => {
+            if (patient && onUpdatePatient) {
+              const newSnapshot = {
+                id: 'visit_' + Date.now(),
+                date: new Date().toLocaleDateString('es-CL'),
+                title,
+                oLearyScore: normalizedOLeary,
+                bopScore: normalizedBop,
+                meanPocketDepth: 2.2, // calculated dynamically inside comparison
+                periodontogram
+              };
+              const updatedHistory = [newSnapshot, ...(patient.periodontogramHistory || [])];
+              onUpdatePatient({
+                ...patient,
+                periodontogramHistory: updatedHistory
+              });
+            }
+          }}
+        />
+      )}
+
     </div>
   );
 }
+
+export default React.memo(PeriodontogramaComponent);
