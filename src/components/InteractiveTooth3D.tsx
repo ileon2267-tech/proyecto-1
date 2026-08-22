@@ -65,6 +65,18 @@ export default function InteractiveTooth3D({
   const [wetness, setWetness] = useState<number>(0.85); // High gloss default
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
+  // Escape key listener for fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
+
   // Physics & Inertia
   const dragStart = useRef({ x: 0, y: 0 });
   const lastTime = useRef<number>(0);

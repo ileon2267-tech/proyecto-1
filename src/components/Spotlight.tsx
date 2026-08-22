@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, ChevronRight, User, Calendar, Settings } from "lucide-react";
+import { Search, ChevronRight, User, Calendar, Settings, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Patient } from "../types";
+import { matchPatientByRut } from "../utils/rutUtils";
 
 interface SpotlightProps {
   patients: Patient[];
@@ -50,7 +51,9 @@ function SpotlightComponent({ patients, onSelectPatient, onNavigate }: Spotlight
 
   const filteredPatients = query ? patients.filter((p) => 
     p.name.toLowerCase().includes(query.toLowerCase()) || 
-    p.phone.includes(query)
+    p.phone.includes(query) ||
+    p.id.toLowerCase().includes(query.toLowerCase()) ||
+    matchPatientByRut(p.rut || p.dni, query)
   ) : [];
 
   const handleSelectPatient = (id: string) => {
@@ -87,20 +90,31 @@ function SpotlightComponent({ patients, onSelectPatient, onNavigate }: Spotlight
               <input 
                 ref={inputRef}
                 type="text" 
-                placeholder="Buscar pacientes o acciones rápidas..."
+                placeholder="Buscar por RUT, nombre o teléfono (Ctrl+K)..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-1 bg-transparent px-4 py-2 outline-none text-slate-800 dark:text-white text-sm"
               />
-              <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-md font-mono font-bold tracking-wide">
-                ESC
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-md font-mono font-bold tracking-wide hidden sm:inline">
+                  ESC
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Cerrar búsqueda (Esc)"
+                  aria-label="Cerrar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="max-h-96 overflow-y-auto p-2">
               {!query ? (
                 <div className="p-4 text-center text-xs text-slate-400">
-                  Escribe para buscar expedientes clínicos.
+                  Escribe un RUT, nombre o teléfono para buscar expedientes clínicos.
                 </div>
               ) : (
                 <>
@@ -113,24 +127,34 @@ function SpotlightComponent({ patients, onSelectPatient, onNavigate }: Spotlight
                         <button 
                           key={p.id}
                           onClick={() => handleSelectPatient(p.id)}
-                          className="w-full flex items-center justify-between p-3 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 rounded-xl transition-all text-left"
+                          className="w-full flex items-center justify-between p-3 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 rounded-xl transition-all text-left group"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800/60 flex flex-col justify-center items-center font-bold text-xs">
+                            <div className="w-8 h-8 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800 flex flex-col justify-center items-center font-bold text-xs">
                               {p.name.charAt(0)}
                             </div>
                             <div>
-                              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{p.name}</div>
-                              <div className="text-[10px] text-slate-450">{p.phone}</div>
+                              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span>{p.name}</span>
+                                {p.rut && (
+                                  <span className="px-1.5 py-0.2 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-mono text-[10px] font-bold border border-teal-500/20">
+                                    {p.rut}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                <span>Exp. #{p.id.split('-')[1] || p.id}</span>
+                                {p.phone && <span> • 📞 {p.phone}</span>}
+                              </div>
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                          <ChevronRight className="w-4 h-4 text-teal-600 dark:text-teal-400 group-hover:translate-x-0.5 transition-transform" />
                         </button>
                       ))}
                     </div>
                   ) : (
                     <div className="p-4 text-center text-xs text-slate-400">
-                      No se encontraron resultados
+                      No se encontraron resultados para "{query}"
                     </div>
                   )}
                   

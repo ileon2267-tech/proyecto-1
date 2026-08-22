@@ -51,7 +51,7 @@ export default function OLearyControl({ patient, onUpdate }: OLearyControlProps)
   const isHighRisk = score > 20;
 
   const renderToothSVG = (toothNum: number) => {
-    const isAbsent = patient.odontogram[toothNum]?.condition === "ausente";
+    const isAbsent = patient?.odontogram?.[toothNum]?.condition === "ausente";
     if (isAbsent) return (
       <div key={toothNum} className="flex flex-col items-center gap-2 shrink-0">
         <span className="text-xs font-bold text-slate-400/50">{toothNum}</span>

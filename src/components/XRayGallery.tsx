@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Patient, XRayImage } from "../types";
-import { Upload, Sun, Contrast, Droplets, Maximize, Trash2, BrainCircuit, ScanSearch } from "lucide-react";
+import { Upload, Sun, Contrast, Droplets, Maximize, Trash2, BrainCircuit, ScanSearch, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface XRayGalleryProps {
@@ -12,6 +12,18 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
   const xrays = patient.xRays || [];
   
   const [selectedImg, setSelectedImg] = useState<XRayImage | null>(null);
+
+  // Escape key handler for full screen modal
+  useEffect(() => {
+    if (!selectedImg) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedImg(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedImg]);
   
   // Real-time CSS Filter states
   const [brightness, setBrightness] = useState(100);
@@ -101,7 +113,7 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
                 </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); removeXRay(x.id); }}
-                  className="absolute top-3 right-3 p-2 bg-rose-500/80 hover:bg-rose-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md"
+                  className="absolute top-3 right-3 p-2 bg-rose-500/80 hover:bg-rose-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -117,13 +129,13 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
              initial={{ opacity: 0, backdropFilter: "blur(0px)" }} 
              animate={{ opacity: 1, backdropFilter: "blur(12px)" }} 
              exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-             className="fixed inset-0 z-[500] bg-black/95 flex flex-col md:flex-row"
+             className="fixed inset-0 z-[500] bg-black/95 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden"
            >
              {/* Main Image View */}
-             <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
+             <div className="flex-1 relative flex items-center justify-center p-4 min-h-[350px] md:min-h-full overflow-hidden">
                <button 
                  onClick={() => setSelectedImg(null)}
-                 className="absolute top-6 left-6 text-white font-bold px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition-all z-50 cursor-pointer backdrop-blur-md"
+                 className="absolute top-6 left-6 text-white font-bold px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition-all z-50 cursor-pointer backdrop-blur-md text-xs sm:text-sm"
                >
                  ← Volver al Expediente
                </button>
@@ -135,7 +147,7 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
                    style={{ 
                      filter: `brightness(${brightness}%) contrast(${contrast}%) invert(${invert}%)`
                    }}
-                   className="max-w-full max-h-[90vh] object-contain transition-all duration-75 rounded-lg shadow-2xl"
+                   className="max-w-full max-h-[70vh] md:max-h-[90vh] object-contain transition-all duration-75 rounded-lg shadow-2xl"
                  />
                  
                  {/* AI Overlay (Simulated Bounding Boxes) */}
@@ -167,13 +179,23 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
              </div>
 
              {/* Right Panel Filters & AI */}
-             <div className="w-full md:w-96 bg-zinc-950 border-l border-white/10 p-8 flex flex-col text-white z-40 shadow-[-20px_0_50px_rgba(0,0,0,0.5)]">
-                <h4 className="font-display font-extrabold text-2xl mb-8 tracking-tight">Estación de Trabajo</h4>
+             <div className="w-full md:w-96 bg-zinc-950 border-t md:border-t-0 md:border-l border-white/10 p-6 md:p-8 flex flex-col text-white z-40 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] overflow-y-auto shrink-0">
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="font-display font-extrabold text-xl md:text-2xl tracking-tight">Estación de Trabajo</h4>
+                  <button
+                    onClick={() => setSelectedImg(null)}
+                    className="p-2 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    title="Cerrar (Esc)"
+                    aria-label="Cerrar"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
                 
-                <div className="mb-10">
+                <div className="mb-8">
                   <button 
                     onClick={runAIAssistant}
-                    className={`w-full py-4 px-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all border ${
+                    className={`w-full py-4 px-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all border cursor-pointer ${
                       aiActive 
                         ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300 shadow-[0_0_20px_rgba(99,102,241,0.2)]" 
                         : "bg-indigo-600 hover:bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/25"
@@ -189,12 +211,12 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
                   )}
                 </div>
 
-                <div className="space-y-8 flex-1">
-                  <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5 space-y-6">
-                    <h5 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Ajustes Radiométricos</h5>
+                <div className="space-y-6 flex-1">
+                  <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5 space-y-5">
+                    <h5 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">Ajustes Radiométricos</h5>
                     
                     <div>
-                      <div className="flex justify-between text-xs mb-3 text-zinc-300 font-bold">
+                      <div className="flex justify-between text-xs mb-2 text-zinc-300 font-bold">
                         <span className="flex items-center gap-2"><Sun className="w-4 h-4 text-amber-100"/> Brillo</span>
                         <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded">{brightness}%</span>
                       </div>
@@ -202,7 +224,7 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
                     </div>
                     
                     <div>
-                      <div className="flex justify-between text-xs mb-3 text-zinc-300 font-bold">
+                      <div className="flex justify-between text-xs mb-2 text-zinc-300 font-bold">
                         <span className="flex items-center gap-2"><Contrast className="w-4 h-4 text-sky-100"/> Contraste</span>
                         <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded">{contrast}%</span>
                       </div>
@@ -210,7 +232,7 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-xs mb-3 text-zinc-300 font-bold">
+                      <div className="flex justify-between text-xs mb-2 text-zinc-300 font-bold">
                         <span className="flex items-center gap-2"><Droplets className="w-4 h-4 text-purple-100"/> Inversión (Ósea)</span>
                         <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded">{invert}%</span>
                       </div>
@@ -227,7 +249,7 @@ export default function XRayGallery({ patient, onUpdate }: XRayGalleryProps) {
                 </div>
                 
                 {selectedImg.notes && (
-                  <div className="mt-8 pt-6 border-t border-white/10">
+                  <div className="mt-6 pt-4 border-t border-white/10">
                     <p className="font-bold text-xs uppercase tracking-widest text-zinc-500 mb-2">Anotaciones clínicas</p>
                     <p className="text-sm text-zinc-300 leading-relaxed font-medium bg-zinc-900/50 p-4 rounded-xl border border-white/5">{selectedImg.notes}</p>
                   </div>

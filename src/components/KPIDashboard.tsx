@@ -26,9 +26,12 @@ function KPIDashboardComponent({
   onSelectPatient,
   onUpdatePatient
 }: KPIDashboardProps) {
-  const todayStr = "2026-06-07"; // Hardcoded to match PerioDash simulated workspace date
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
   
-  const todayAppointments = useMemo(() => appointments.filter((app) => app.date === todayStr), [appointments]);
+  const todayAppointments = useMemo(() => appointments.filter((app) => app.date === todayStr), [appointments, todayStr]);
   const confirmedToday = useMemo(() => todayAppointments.filter((app) => app.status === "Confirmed").length, [todayAppointments]);
   
   // Calculate clinical statistics for BOP % and Plaque % from patients with active records
@@ -338,7 +341,9 @@ function KPIDashboardComponent({
                 <Calendar className="w-6 h-6 text-teal-600 dark:text-teal-400" />
                 <span>Citas Planificadas para Hoy</span>
               </h2>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">Domingo, 7 de junio de 2026 — Programación Diaria</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 capitalize">
+                {new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} — Programación Diaria
+              </p>
             </div>
             <span className="bg-slate-200/50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 text-xs px-4 py-1.5 rounded-full font-bold border border-white/40 dark:border-white/10 shadow-sm backdrop-blur-md">
               {todayAppointments.length} Cita{todayAppointments.length !== 1 ? 's' : ''}
@@ -360,13 +365,21 @@ function KPIDashboardComponent({
                     </div>
                     <div>
                       <h4 
-                        className="text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors cursor-pointer inline-flex items-center gap-1.5 leading-none"
+                        className="text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors cursor-pointer inline-flex items-center gap-1.5 leading-none flex-wrap"
                         onClick={() => {
                           onSelectPatient(app.patientId);
                           onNavigateTo("clinica");
                         }}
                       >
                         <span>{app.patientName}</span>
+                        {(() => {
+                          const patientObj = patients.find(p => p.id === app.patientId);
+                          return patientObj?.rut ? (
+                            <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-mono text-[10px] font-bold border border-teal-500/20">
+                              {patientObj.rut}
+                            </span>
+                          ) : null;
+                        })()}
                         <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all text-teal-600" />
                       </h4>
                       <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">

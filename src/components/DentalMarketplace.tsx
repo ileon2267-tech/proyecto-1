@@ -268,6 +268,18 @@ export default function DentalMarketplace() {
     }
   }, []);
 
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (activeContactItem) setActiveContactItem(null);
+        if (showAddModal) setShowAddModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeContactItem, showAddModal]);
+
   const handleCreateListing = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newPrice || !newDescription) return;
@@ -669,18 +681,25 @@ export default function DentalMarketplace() {
       {/* MODAL: Add New Listing Form */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs">
+          <div 
+            onClick={() => setShowAddModal(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl w-full max-w-2xl max-h-[90svh] overflow-y-auto shadow-2xl relative block"
             >
               <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-100 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 rounded-xl cursor-pointer transition-all duration-150"
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full cursor-pointer transition-all duration-150"
+                title="Cerrar ventana"
+                aria-label="Cerrar"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
 
               <form onSubmit={handleCreateListing} className="space-y-5">
@@ -900,29 +919,36 @@ export default function DentalMarketplace() {
       {/* MODAL: Contact Seller / Live simulation sheet */}
       <AnimatePresence>
         {activeContactItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs">
+          <div 
+            onClick={() => setActiveContactItem(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative"
             >
               <button
+                type="button"
                 onClick={() => setActiveContactItem(null)}
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-100 bg-slate-50 dark:bg-slate-800 rounded-xl cursor-pointer transition-all duration-150"
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full cursor-pointer transition-all duration-150"
+                title="Cerrar ventana"
+                aria-label="Cerrar"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
 
               <div className="space-y-4">
-                <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 pr-8">
                   <h3 className="font-display font-black text-base text-slate-800 dark:text-white">Contactar Dentista / Colega</h3>
                   <p className="text-xs text-slate-400 dark:text-slate-400">Ponte en contacto directo para acordar pago o programar entrega física del material.</p>
                 </div>
 
                 {/* Listing Summary Row */}
                 <div className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center gap-3">
-                  <div className="w-10 h-10 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center font-black text-lg">
+                  <div className="w-10 h-10 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center font-black text-lg shrink-0">
                     {activeContactItem.title.charAt(0)}
                   </div>
                   <div className="space-y-0.5 overflow-hidden">
@@ -936,15 +962,15 @@ export default function DentalMarketplace() {
                 {/* Direct info list */}
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center gap-2.5 p-1 text-slate-600 dark:text-slate-300">
-                    <MapPin className="w-4 h-4 text-slate-400" />
+                    <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                     <span><strong>Sector:</strong> {activeContactItem.location}</span>
                   </div>
                   <div className="flex items-center gap-2.5 p-1 text-slate-600 dark:text-slate-300">
-                    <Phone className="w-4 h-4 text-slate-400" />
+                    <Phone className="w-4 h-4 text-slate-400 shrink-0" />
                     <span className="font-mono"><strong>WhatsApp:</strong> {activeContactItem.sellerPhone}</span>
                   </div>
                   <div className="flex items-center gap-2.5 p-1 text-slate-600 dark:text-slate-300">
-                    <Mail className="w-4 h-4 text-slate-400" />
+                    <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                     <span className="truncate"><strong>Email:</strong> {activeContactItem.sellerEmail}</span>
                   </div>
                 </div>
@@ -961,6 +987,15 @@ export default function DentalMarketplace() {
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveContactItem(null)}
+                    className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 font-bold text-xs rounded-xl cursor-pointer duration-150 inline-flex items-center justify-center gap-1.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Cerrar</span>
+                  </button>
+
                   <a 
                     href={`mailto:${activeContactItem.sellerEmail}?subject=Interés en ${encodeURIComponent(activeContactItem.title)}&body=${encodeURIComponent(contactMessage)}`}
                     className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl cursor-pointer text-center duration-150 inline-flex items-center justify-center gap-1.5"
@@ -974,7 +1009,7 @@ export default function DentalMarketplace() {
                     className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl cursor-pointer duration-150 flex items-center justify-center gap-1.5"
                   >
                     <Phone className="w-4 h-4" />
-                    <span>Ir a WhatsApp</span>
+                    <span>WhatsApp</span>
                   </button>
                 </div>
 

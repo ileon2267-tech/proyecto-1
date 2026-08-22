@@ -106,9 +106,18 @@ export default function PatientPortal({
   onAddAppointment 
 }: PatientPortalProps) {
   
+  const getTomorrowStr = (): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClinician, setSelectedClinician] = useState("");
-  const [selectedDate, setSelectedDate] = useState("2026-06-20");
+  const [selectedDate, setSelectedDate] = useState(getTomorrowStr);
   const [selectedTime, setSelectedTime] = useState("10:00");
   const [selectedTreatment, setSelectedTreatment] = useState("Control Dental General");
   const [formSuccess, setFormSuccess] = useState(false);

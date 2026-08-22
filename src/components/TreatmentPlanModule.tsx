@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Patient, TreatmentProcedure, TreatmentPlan, ToothState, PeriodonState, InformedConsentRecord } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, Plus, Trash2, Calculator, CheckCircle2, DollarSign, 
   AlertTriangle, Sparkles, Eye, ArrowRight, Activity, Smile, 
   Layers, Check, Sparkle, RefreshCw, HelpCircle, Info,
-  ShieldCheck, Camera, FileCheck, PenTool, Lock, ShieldAlert
+  ShieldCheck, Camera, FileCheck, PenTool, Lock, ShieldAlert, X
 } from 'lucide-react';
 import { InformedConsentModal } from './InformedConsentModal';
 
@@ -44,6 +44,17 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
   const [viewPredictive, setViewPredictive] = useState<'initial' | 'predicted'>('predicted');
   const [selectedProcForConsent, setSelectedProcForConsent] = useState<TreatmentProcedure | null>(null);
   const [blockedProcedureAlert, setBlockedProcedureAlert] = useState<TreatmentProcedure | null>(null);
+
+  useEffect(() => {
+    if (!blockedProcedureAlert) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setBlockedProcedureAlert(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [blockedProcedureAlert]);
 
   const tp = patient.treatmentPlan || { procedures: [], financing: { months: 1, downPayment: 0, interestRate: 0 } };
   const procedures = tp.procedures || [];
@@ -331,7 +342,7 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
 
   // Tooth predicted condition check for Point 1
   const getToothPredictedStatus = (toothNum: number) => {
-    const original = patient.odontogram[toothNum] || {
+    const original = patient?.odontogram?.[toothNum] || {
       toothNumber: toothNum,
       surfaces: { vestibular: 'sano', occlusal: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano' },
       condition: 'sano'
@@ -1006,13 +1017,27 @@ export default function TreatmentPlanModule({ patient, aranceles, onUpdatePatien
 
       {/* Legal Lock Execution Alert Modal */}
       {blockedProcedureAlert && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+        <div 
+          onClick={() => setBlockedProcedureAlert(null)}
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+        >
           <motion.div 
             initial={{ opacity: 0, scale: 0.9, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            className="bg-white dark:bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center relative max-h-[90vh] overflow-y-auto my-auto flex flex-col"
           >
+            <button
+              type="button"
+              onClick={() => setBlockedProcedureAlert(null)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full cursor-pointer transition-all duration-150"
+              title="Cerrar ventana"
+              aria-label="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
             <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-500">
               <Lock className="w-7 h-7 animate-pulse" />
             </div>

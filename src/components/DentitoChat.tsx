@@ -277,7 +277,12 @@ He completado el análisis espectrográfico e interpretación semántica del arc
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
   const [isListening, setIsListening] = useState(false);
   const [emergencyMode, setEmergencyMode] = useState<string | null>(null); 
   const isDraggingRef = useRef(false);
@@ -308,6 +313,22 @@ He completado el análisis espectrográfico e interpretación semántica del arc
     window.addEventListener("periodash-open-dentito", handleOpenDentito);
     return () => window.removeEventListener("periodash-open-dentito", handleOpenDentito);
   }, []);
+
+  // Global Escape key listener for emergency mode and Dentito window
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (emergencyMode) {
+          setEmergencyMode(null);
+        } else if (!isMinimized) {
+          setIsMinimized(true);
+          setShowPositionMenu(false);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [emergencyMode, isMinimized]);
 
   const speak = (text: string) => {
     if (!speechSupported || !ttsEnabled || !window.speechSynthesis) return;
@@ -388,6 +409,13 @@ He completado el análisis espectrográfico e interpretación semántica del arc
   }, []);
 
   const getPositionClasses = () => {
+    if (isMobile) {
+      if (isMinimized) {
+        return "hidden";
+      }
+      return "inset-x-0 bottom-0 top-auto h-[88vh] max-h-[88vh] w-full rounded-t-[2.5rem] rounded-b-none border-t border-teal-500/40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[100]";
+    }
+
     if (isMinimized) {
       switch (positionState) {
         case "bottom-left":
@@ -403,15 +431,15 @@ He completado el análisis espectrográfico e interpretación semántica del arc
 
     switch (positionState) {
       case "bottom-left":
-        return "bottom-20 left-4 md:bottom-8 md:left-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
+        return "bottom-20 left-4 md:bottom-8 md:left-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100vh-5rem)] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
       case "top-right":
-        return "top-20 right-4 md:top-8 md:right-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
+        return "top-20 right-4 md:top-8 md:right-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100vh-5rem)] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
       case "top-left":
-        return "top-20 left-4 md:top-8 md:left-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
+        return "top-20 left-4 md:top-8 md:left-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100vh-5rem)] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
       case "fullscreen":
-        return "top-4 bottom-[calc(90px+env(safe-area-inset-bottom))] inset-x-4 md:top-8 md:bottom-8 md:right-8 md:left-auto md:w-[450px] md:h-[calc(100vh-80px)] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
+        return "top-4 bottom-[calc(90px+env(safe-area-inset-bottom))] inset-x-4 md:top-8 md:bottom-8 md:right-8 md:left-auto md:w-[450px] md:h-[calc(100vh-80px)] max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100vh-5rem)] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
       default: // bottom-right
-        return "bottom-20 right-4 md:bottom-8 md:right-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
+        return "bottom-20 right-4 md:bottom-8 md:right-8 w-[calc(100vw-32px)] md:w-[400px] h-[520px] md:h-[600px] max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100vh-5rem)] overflow-hidden shadow-2xl scale-100 rounded-[2rem]";
     }
   };
 
@@ -590,10 +618,10 @@ He completado el análisis espectrográfico e interpretación semántica del arc
     // --- ENHANCED OFFLINE HEURISTICS WITH HIGH INTELLECTUAL VALUE ---
 
     // 1. Directorio de pacientes
-    if (raw.includes("pacientes") || raw.includes("directorios") || (raw.includes("paciente") && (raw.includes("lista") || raw.includes("todos") || raw.includes("cuantos")))) {
+    if (raw.includes("pacientes") || raw.includes("directorios") || (raw.includes("paciente") && (raw.includes("lista") || raw.includes("todos") || raw.includes("cuantos") || raw.includes("rut")))) {
       if (patients && patients.length > 0) {
-        const rows = patients.map(p => `| **${p.name}** | ${p.phone} | ${p.birthdate} | \`Activo\` |`).join("\n");
-        return `📋 **Directorio de Pacientes - Análisis Local**\n\nHe escaneado el registro general de la clínica y encontré **${patients.length} pacientes activos** en el sistema:\n\n| Nombre del Paciente | Teléfono | Fecha Nacimiento | Estado |\n| :--- | :--- | :--- | :--- |\n${rows}\n\n*Puedes pulsar el buscador \`Ctrl+K\` en cualquier momento para ubicar su ficha clínica de inmediato.*`;
+        const rows = patients.map(p => `| **${p.name}** | \`${p.rut || p.dni || "S/RUT"}\` | ${p.phone} | ${p.birthdate} | \`Activo\` |`).join("\n");
+        return `📋 **Directorio de Pacientes - Análisis Local**\n\nHe escaneado el registro general de la clínica y encontré **${patients.length} pacientes activos** en el sistema:\n\n| Nombre del Paciente | RUT / DNI | Teléfono | Fecha Nacimiento | Estado |\n| :--- | :--- | :--- | :--- | :--- |\n${rows}\n\n*Puedes pulsar el buscador \`Ctrl+K\` en cualquier momento para ubicar su ficha clínica de inmediato por RUT o nombre.*`;
       } else {
         return "Actualmente dispones de una lista inicial de pacientes cargada en local. Selecciona la pestaña **Pacientes** para agregar más expedientes.";
       }
@@ -852,14 +880,20 @@ He completado el análisis espectrográfico e interpretación semántica del arc
         {emergencyMode && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}
-            className="fixed inset-0 z-[999] bg-rose-950/80 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-6 text-white overflow-hidden"
+            onClick={() => setEmergencyMode(null)}
+            className="fixed inset-0 z-[999] bg-rose-950/80 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-6 text-white overflow-hidden cursor-pointer"
           >
-            <div className="max-w-4xl w-full max-h-[92vh] overflow-y-auto bg-rose-900/30 backdrop-blur-md p-6 md:p-10 rounded-3xl border border-rose-500/30 shadow-[0_0_100px_rgba(244,63,94,0.2)] relative hide-scrollbar">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-4xl w-full max-h-[92vh] overflow-y-auto bg-rose-900/30 backdrop-blur-md p-6 md:p-10 rounded-3xl border border-rose-500/30 shadow-[0_0_100px_rgba(244,63,94,0.2)] relative hide-scrollbar cursor-default"
+            >
               <button 
                 onClick={() => setEmergencyMode(null)}
-                className="absolute top-6 right-6 px-4 py-2 bg-rose-500/20 hover:bg-rose-500/40 rounded-full font-bold transition-all text-xs cursor-pointer border border-rose-500/50"
+                className="absolute top-6 right-6 px-4 py-2 bg-rose-500/20 hover:bg-rose-500/40 rounded-full font-bold transition-all text-xs cursor-pointer border border-rose-500/50 flex items-center gap-1.5"
+                title="Cerrar ventana de emergencia (Esc)"
               >
-                Cerrar Protocolos
+                <X className="w-4 h-4" />
+                <span>Cerrar</span>
               </button>
               
               <div className="flex items-center gap-4 md:gap-6 mb-6 md:mb-10">
@@ -957,7 +991,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
 
       <AnimatePresence mode="wait">
         {isMinimized ? (
-          /* MINIMIZED FLOATING TRIGGER BUTTON */
+          /* MINIMIZED FLOATING TRIGGER BUTTON (DESKTOP ONLY, ON MOBILE THE BOTTOM DOCK HAS DENTITO) */
           <motion.div
             key="dentito-minimized-orb"
             initial={{ scale: 0.8, opacity: 0, y: 10 }}
@@ -966,11 +1000,11 @@ He completado el análisis espectrográfico e interpretación semántica del arc
             transition={{ duration: 0.2, ease: "easeOut" }}
             onClick={() => setIsMinimized(false)}
             title="Abrir Asistente Clínico Dentito"
-            className={`fixed z-[99] print:hidden cursor-pointer group select-none ${
-              positionState === "bottom-left" ? "bottom-20 left-4 md:bottom-24 md:left-6" :
-              positionState === "top-right" ? "top-20 right-4 md:top-6 md:right-6" :
-              positionState === "top-left" ? "top-20 left-4 md:top-6 md:left-6" :
-              "bottom-20 right-4 md:bottom-24 md:right-6" // default bottom-right
+            className={`hidden md:flex fixed z-[99] print:hidden cursor-pointer group select-none ${
+              positionState === "bottom-left" ? "bottom-24 left-6" :
+              positionState === "top-right" ? "top-6 right-6" :
+              positionState === "top-left" ? "top-6 left-6" :
+              "bottom-24 right-6" // default bottom-right
             }`}
           >
             <div className="relative p-1 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border border-teal-500/40 dark:border-teal-400/30 rounded-full shadow-[0_10px_35px_rgba(20,184,166,0.35)] dark:shadow-[0_10px_35px_rgba(20,184,166,0.5)] flex items-center gap-2.5 px-3 py-2 hover:scale-105 active:scale-95 transition-all">
@@ -992,29 +1026,41 @@ He completado el análisis espectrográfico e interpretación semántica del arc
             </div>
           </motion.div>
         ) : (
-          /* FULL CHAT MODAL CONTAINER */
-          <motion.div 
-            key={`dentito-chat-window-${positionState}`}
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            drag={positionState !== "fullscreen"}
-            dragConstraints={getDragConstraints()}
-            dragElastic={0.05}
-            dragMomentum={false}
-            onDragStart={() => {
-              isDraggingRef.current = true;
-            }}
-            onDragEnd={() => {
-              setTimeout(() => {
-                isDraggingRef.current = false;
-              }, 60);
-            }}
-            className={`fixed z-[99] print:hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col
-              bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80
-              ${getPositionClasses()}`}
-          >
+          <>
+            {/* Mobile Backdrop when open */}
+            {isMobile && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="md:hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[99] no-print"
+                onClick={() => setIsMinimized(true)}
+              />
+            )}
+
+            {/* FULL CHAT MODAL CONTAINER */}
+            <motion.div 
+              key={`dentito-chat-window-${positionState}`}
+              initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 12 }}
+              animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
+              exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              drag={!isMobile && positionState !== "fullscreen"}
+              dragConstraints={getDragConstraints()}
+              dragElastic={0.05}
+              dragMomentum={false}
+              onDragStart={() => {
+                isDraggingRef.current = true;
+              }}
+              onDragEnd={() => {
+                setTimeout(() => {
+                  isDraggingRef.current = false;
+                }, 60);
+              }}
+              className={`fixed z-[100] md:z-[99] print:hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col
+                bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80
+                ${getPositionClasses()}`}
+            >
             {/* Header - Glassmorphic */}
             <div 
               className="flex items-center justify-between px-5 py-3 border-b border-slate-200/60 dark:border-slate-800/80 cursor-grab active:cursor-grabbing relative bg-gradient-to-br from-teal-500/10 via-transparent to-transparent select-none shrink-0"
@@ -1136,6 +1182,17 @@ He completado el análisis espectrográfico e interpretación semántica del arc
                   title="Minimizar Dentito"
                 >
                   <Minimize2 className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMinimized(true);
+                    setShowPositionMenu(false);
+                  }}
+                  className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-500/10 hover:text-rose-500 rounded-full transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/50 text-slate-600 dark:text-slate-300"
+                  title="Cerrar Dentito (Esc)"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1408,6 +1465,7 @@ He completado el análisis espectrográfico e interpretación semántica del arc
               </div>
             </div>
           </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { MessageSquare, Share2, Coins, ArrowUpRight, Upload, Download, FileText, CheckCircle, Search, UserCheck, Heart, Sparkles, Filter, ChevronRight, DollarSign, Paperclip, Trash2, Image as ImageIcon, Sparkle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { MessageSquare, Share2, Coins, ArrowUpRight, Upload, Download, FileText, CheckCircle, Search, UserCheck, Heart, Sparkles, Filter, ChevronRight, DollarSign, Paperclip, Trash2, Image as ImageIcon, Sparkle, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // Interfaces
@@ -267,6 +267,18 @@ export default function DentalStories() {
       setStudyAttachedFile(null);
     }, 1200);
   };
+
+  // Escape key handler for buy confirmation modal
+  useEffect(() => {
+    if (!buyingStudyId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setBuyingStudyId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [buyingStudyId]);
 
   const handleBuyStudy = (studyId: string, price: number, title: string) => {
     setBuyingStudyId(studyId);
@@ -875,14 +887,26 @@ export default function DentalStories() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => setBuyingStudyId(null)}
             className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[210] flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-white dark:bg-[#09090b] border border-slate-200 dark:border-slate-800/80 rounded-[2rem] max-w-md w-full p-6 shadow-2xl relative"
             >
+              <button
+                type="button"
+                onClick={() => setBuyingStudyId(null)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full cursor-pointer transition-all duration-150"
+                title="Cerrar ventana"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
               <div className="space-y-4">
                 <div className="w-12 h-12 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl flex items-center justify-center border border-teal-500/20">
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>

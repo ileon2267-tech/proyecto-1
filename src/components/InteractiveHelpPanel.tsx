@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Sparkles, HelpCircle, BookOpen, Activity, Play, Zap, Compass, Info,
   CheckCircle2, ChevronRight, X, AlertCircle, FileText, ChevronDown,
@@ -35,6 +35,17 @@ export default function InteractiveHelpPanel({
 }: InteractiveHelpPanelProps) {
   const [activeStep, setActiveStep] = useState<number>(0);
   const [simulationSuccess, setSimulationSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   const steps = [
     {

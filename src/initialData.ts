@@ -109,6 +109,7 @@ export const INITIAL_PATIENTS: Patient[] = [
   {
     id: "pat-1",
     name: "Carlos Mendoza Silva",
+    rut: "12.345.678-5",
     phone: "+56 9 8472 1923",
     email: "carlos.mendoza@email.com",
     birthdate: "1983-05-14",
@@ -236,6 +237,7 @@ export const INITIAL_PATIENTS: Patient[] = [
   {
     id: "pat-2",
     name: "Ana María Valenzuela",
+    rut: "18.943.210-K",
     phone: "+56 9 7321 0044",
     email: "ana.valenzuela@email.com",
     birthdate: "1994-09-22",
@@ -255,6 +257,7 @@ export const INITIAL_PATIENTS: Patient[] = [
   {
     id: "pat-3",
     name: "Roberto Gómez Ortiz",
+    rut: "9.876.543-2",
     phone: "+56 9 9128 4432",
     email: "rgomez.ortiz@email.com",
     birthdate: "1965-11-03",
@@ -349,12 +352,21 @@ export const INITIAL_PATIENTS: Patient[] = [
   }
 ];
 
+const getTodayStr = (offsetDays = 0): string => {
+  const d = new Date();
+  if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: "app-1",
     patientId: "pat-1",
     patientName: "Carlos Mendoza Silva",
-    date: "2026-06-07",
+    date: getTodayStr(0),
     time: "15:00",
     treatment: "Tratamiento Periodontal Quadrant Upper Right & Obturación P. 16",
     status: "Confirmed",
@@ -364,7 +376,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     id: "app-2",
     patientId: "pat-2",
     patientName: "Ana María Valenzuela",
-    date: "2026-06-07",
+    date: getTodayStr(0),
     time: "16:30",
     treatment: "Limpieza ultrasónica, Profilaxis y Guardia Oclusal",
     status: "Pending",
@@ -374,7 +386,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     id: "app-3",
     patientId: "pat-3",
     patientName: "Roberto Gómez Ortiz",
-    date: "2026-06-08",
+    date: getTodayStr(1),
     time: "09:00",
     treatment: "Sondaje periodontal completo y raspado coronorradicular",
     status: "Confirmed",

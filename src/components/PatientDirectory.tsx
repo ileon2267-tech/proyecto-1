@@ -14,9 +14,13 @@ import {
   Phone,
   Mail,
   FileText,
-  Calendar
+  Calendar,
+  X,
+  CreditCard,
+  CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { formatRut, matchPatientByRut, validateRut } from "../utils/rutUtils";
 
 interface PatientDirectoryProps {
   patients: Patient[];
@@ -33,6 +37,8 @@ interface PatientDirectoryProps {
   handleRegisterPatient: (e: React.FormEvent) => void;
   newPatientName: string;
   setNewPatientName: (val: string) => void;
+  newPatientRut: string;
+  setNewPatientRut: (val: string) => void;
   newPatientPhone: string;
   setNewPatientPhone: (val: string) => void;
   newPatientEmail: string;
@@ -58,6 +64,8 @@ function PatientDirectoryComponent({
   handleRegisterPatient,
   newPatientName,
   setNewPatientName,
+  newPatientRut,
+  setNewPatientRut,
   newPatientPhone,
   setNewPatientPhone,
   newPatientEmail,
@@ -70,7 +78,20 @@ function PatientDirectoryComponent({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  // Filtered list
+  // Escape key handler for register/edit form
+  useEffect(() => {
+    if (!showRegisterForm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowRegisterForm(false);
+        setEditingPatientId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showRegisterForm, setShowRegisterForm, setEditingPatientId]);
+
+  // Filtered list - Support search by Name, Email, Phone, ID, and RUT (with and without format)
   const filteredPatients = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return patients;
@@ -79,7 +100,8 @@ function PatientDirectoryComponent({
         p.name.toLowerCase().includes(q) ||
         p.email.toLowerCase().includes(q) ||
         p.phone.includes(q) ||
-        p.id.toLowerCase().includes(q)
+        p.id.toLowerCase().includes(q) ||
+        matchPatientByRut(p.rut || p.dni, searchQuery)
     );
   }, [patients, searchQuery]);
 
@@ -164,13 +186,27 @@ function PatientDirectoryComponent({
             onSubmit={handleRegisterPatient} 
             className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800/80 space-y-4 shadow-xl"
           >
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2 border-b border-slate-50 dark:border-slate-800 pb-3 w-full">
-              <UserPlus className="w-4 h-4 text-teal-600" />
-              <span>{editingPatientId ? "Editar Expediente" : "Nuevo Expediente Histórico Odontorradicular"}</span>
-            </h4>
+            <div className="flex items-center justify-between border-b border-slate-50 dark:border-slate-800 pb-3 w-full">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-teal-600" />
+                <span>{editingPatientId ? "Editar Expediente" : "Nuevo Expediente Histórico Odontorradicular"}</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRegisterForm(false);
+                  setEditingPatientId(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Cerrar formulario (Esc)"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="space-y-1.5 lg:col-span-2">
                 <label className="text-xs text-slate-400 font-bold block uppercase tracking-wider">Nombre Completo:</label>
                 <input 
                   type="text" 
@@ -179,6 +215,24 @@ function PatientDirectoryComponent({
                   onChange={(e) => setNewPatientName(e.target.value)}
                   className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20 text-slate-800 dark:text-slate-100"
                   required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-slate-400 font-bold block uppercase tracking-wider">RUT / DNI:</label>
+                  {newPatientRut && (
+                    <span className={`text-[10px] font-mono font-bold ${validateRut(newPatientRut) ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                      {validateRut(newPatientRut) ? '✓ Válido' : 'RUT'}
+                    </span>
+                  )}
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="12.345.678-5 o 18943210K"
+                  value={newPatientRut}
+                  onChange={(e) => setNewPatientRut(formatRut(e.target.value))}
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/20 text-slate-800 dark:text-slate-100 font-mono"
                 />
               </div>
 
@@ -233,6 +287,7 @@ function PatientDirectoryComponent({
                   setShowRegisterForm(false);
                   setEditingPatientId(null);
                   setNewPatientName("");
+                  setNewPatientRut("");
                   setNewPatientPhone("");
                   setNewPatientEmail("");
                   setNewPatientBirthdate("");
@@ -263,10 +318,10 @@ function PatientDirectoryComponent({
             </span>
             <input
               type="text"
-              placeholder="Buscar por nombre, correo, teléfono o ID..."
+              placeholder="Buscar por RUT, nombre, correo, teléfono o ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs sm:text-sm p-2.5 pl-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-800 dark:text-slate-200 shadow-xs"
+              className="w-full text-xs sm:text-sm p-2.5 pl-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-800 dark:text-slate-200 shadow-xs font-medium"
             />
           </div>
 
@@ -290,7 +345,7 @@ function PatientDirectoryComponent({
           <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
             <thead className="text-[11px] uppercase bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold tracking-wider">
               <tr>
-                <th className="px-6 py-3.5">Paciente</th>
+                <th className="px-6 py-3.5">Paciente & RUT</th>
                 <th className="px-6 py-3.5">Contacto</th>
                 <th className="px-6 py-3.5 text-center">Fichas Clínicas</th>
                 <th className="px-6 py-3.5 text-right">Acciones</th>
@@ -305,8 +360,18 @@ function PatientDirectoryComponent({
                         {p.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">{p.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">ID: {p.id.split('-')[1] || p.id}</div>
+                        <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center gap-2">
+                          <span>{p.name}</span>
+                          {p.rut && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-300 font-mono text-[10px] font-bold border border-teal-500/20">
+                              {p.rut}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+                          <span>ID: {p.id.split('-')[1] || p.id}</span>
+                          {p.birthdate && <span>• 🎂 {p.birthdate}</span>}
+                        </div>
                       </div>
                     </div>
                   </td>

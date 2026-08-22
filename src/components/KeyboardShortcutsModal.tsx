@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Keyboard, Zap, Sparkles, Command, PhoneCall, Calendar, UserPlus, Stethoscope, Mic } from 'lucide-react';
 
@@ -9,6 +9,17 @@ interface KeyboardShortcutsModalProps {
 }
 
 export default function KeyboardShortcutsModal({ isOpen, onClose, onAction = () => {} }: KeyboardShortcutsModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const SHORTCUTS = [
@@ -24,15 +35,19 @@ export default function KeyboardShortcutsModal({ isOpen, onClose, onAction = () 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
+      <div 
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print overflow-y-auto"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col my-auto"
         >
           {/* Header */}
-          <div className="p-6 bg-gradient-to-r from-teal-600 to-emerald-600 text-white flex items-center justify-between">
+          <div className="p-6 bg-gradient-to-r from-teal-600 to-emerald-600 text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md">
                 <Zap className="w-6 h-6 text-white" />
@@ -44,14 +59,14 @@ export default function KeyboardShortcutsModal({ isOpen, onClose, onAction = () 
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-5 h-5 text-white" />
             </button>
           </div>
 
           {/* List of shortcuts */}
-          <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+          <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto flex-1">
             <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
               Teclas de acceso rápido globales
             </div>
@@ -80,13 +95,13 @@ export default function KeyboardShortcutsModal({ isOpen, onClose, onAction = () 
           </div>
 
           {/* Quick Actions Footer */}
-          <div className="p-4 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500 shrink-0">
             <span className="flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-teal-500" /> Presiona <kbd className="font-mono bg-slate-200 dark:bg-slate-800 px-1 rounded">Esc</kbd> para cerrar
             </span>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-xs"
+              className="px-4 py-2 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-xs cursor-pointer"
             >
               Entendido
             </button>

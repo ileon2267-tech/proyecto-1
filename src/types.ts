@@ -161,6 +161,39 @@ export interface CustomSpecialtyMarker {
   createdAt: string;
 }
 
+export interface ClinicalPhoto {
+  id: string;
+  url: string;
+  date: string;
+  category: "facial" | "intraoral" | "oclusal" | "perfil" | "sonrisa" | "antes_despues";
+  tag: "antes" | "despues" | "seguimiento";
+  notes?: string;
+}
+
+export interface PatientCommunication {
+  id: string;
+  date: string;
+  type: "whatsapp" | "email" | "sms";
+  template: "recordatorio_cita" | "postoperatorio" | "presupuesto" | "higiene_mantenimiento" | "custom";
+  recipient: string;
+  message: string;
+  status: "sent" | "failed" | "queued";
+}
+
+export interface PaymentTransaction {
+  id: string;
+  patientId: string;
+  patientName: string;
+  date: string;
+  amount: number;
+  method: "webpay" | "mercadopago" | "stripe" | "transferencia" | "efectivo" | "tarjeta_pos";
+  status: "completed" | "pending" | "failed";
+  concept: string;
+  receiptNumber?: string;
+  transactionRef?: string;
+  paymentGateway?: string;
+}
+
 export interface Patient {
   id: string;
   name: string;
@@ -184,9 +217,12 @@ export interface Patient {
   oLeary: Record<number, OLearyState>;
   anamnesis: Anamnesis;
   xRays: XRayImage[];
+  clinicalPhotos?: ClinicalPhoto[];
+  communications?: PatientCommunication[];
   treatmentPlan: TreatmentPlan;
   evolutions: Evolution[];
   consentimientos?: Consentimiento[];
+  payments?: PaymentTransaction[];
   activeSpecialty?: string;
   specialtyData?: Record<string, any>;
   customSpecialtyMarkers?: CustomSpecialtyMarker[];
@@ -202,6 +238,8 @@ export interface Appointment {
   status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
   flowStatus?: ClinicalFlowStatus;
   box?: string; // e.g., "Sillón 1", "Sillón 2", "Sillón 3"
+  googleCalendarEventId?: string;
+  googleCalendarSyncedAt?: string;
 }
 
 export interface ChatMessage {

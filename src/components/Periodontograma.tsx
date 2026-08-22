@@ -915,15 +915,16 @@ function PeriodontogramaComponent({ periodontogram, onChange, odontogram, patien
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setIsFastProbingActive(!isFastProbingActive)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               isFastProbingActive
                 ? 'bg-amber-500 text-slate-900 font-bold shadow-md'
                 : 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 hover:bg-amber-500/20'
             }`}
-            title="Activar entrada rápida con teclado numérico"
+            title="Activar entrada rápida con dictado por voz y teclado numérico continuo"
           >
-            <Zap className="w-3.5 h-3.5" />
-            Sondaje Rápido
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span>Sondaje Rápido & Dictado</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           </button>
 
           {patient && (

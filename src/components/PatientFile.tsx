@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Patient, Evolution, Anamnesis, Consentimiento } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import ClinicalPhotography from './ClinicalPhotography';
+import PatientCommunications from './PatientCommunications';
 import { 
   Save, 
   Plus, 
@@ -26,7 +28,11 @@ import {
   Baby,
   Info,
   ChevronRight,
-  HelpCircle
+  HelpCircle,
+  Camera,
+  MessageSquare,
+  ArrowLeft,
+  Users
 } from 'lucide-react';
 
 interface PatientFileProps {
@@ -64,7 +70,7 @@ const ToggleHeader = ({ id, icon: Icon, title, description, expandedSection, set
 }
 
 export default function PatientFile({ patient, onUpdatePatient, onClose }: PatientFileProps) {
-  const [activeTab, setActiveTab] = useState<'anamnesis' | 'evoluciones' | 'consentimientos'>('anamnesis');
+  const [activeTab, setActiveTab] = useState<'anamnesis' | 'evoluciones' | 'consentimientos' | 'fotografia' | 'comunicaciones'>('anamnesis');
   const [expandedSection, setExpandedSection] = useState<string>('motivo');
   
   // Consentimientos state
@@ -75,6 +81,17 @@ export default function PatientFile({ patient, onUpdatePatient, onClose }: Patie
   const [signingId, setSigningId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    if (!signingId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSigningId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [signingId]);
 
   // Legal Texts for Consents
   const CONSENT_TEXTS: Record<string, string> = {
@@ -289,6 +306,16 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
       {/* Real-time Clinical Flow & Chair Tracker Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-teal-950 text-white p-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shrink-0"
+              title="Cerrar ficha y volver al directorio de pacientes"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Directorio</span>
+            </button>
+          )}
           <div className="p-2 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
             <User className="w-4 h-4" />
           </div>
@@ -422,6 +449,35 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
         </div>
       </div>
 
+      {/* Patient Demographic & Identification Ribbon */}
+      <div className="bg-slate-900/90 text-white px-5 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-teal-500/20 border border-teal-500/30 flex items-center justify-center font-display font-black text-teal-300 text-sm">
+            {patient.name.charAt(0)}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-bold text-white tracking-tight">{patient.name}</h2>
+              {patient.rut ? (
+                <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/40 text-xs font-mono font-bold">
+                  RUT: {patient.rut}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-[11px] font-mono">
+                  Sin RUT
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-slate-400 flex items-center gap-3 mt-0.5 flex-wrap font-medium">
+              <span className="font-mono">Expediente: #{patient.id.split('-')[1] || patient.id}</span>
+              {patient.birthdate && <span>🎂 {patient.birthdate}</span>}
+              {patient.phone && <span>📞 {patient.phone}</span>}
+              {patient.email && <span>✉️ {patient.email}</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Patient Lifecycle Status & Staging Bar */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 rounded-t-none flex flex-wrap items-center justify-between gap-3 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">
@@ -527,7 +583,29 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
           }`}
         >
           <PenTool className="w-4 h-4" />
-          Consentimientos
+          Consentimientos & Firma
+        </button>
+        <button
+          onClick={() => setActiveTab('fotografia')}
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 flex-shrink-0 ${
+            activeTab === 'fotografia' 
+              ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+          }`}
+        >
+          <Camera className="w-4 h-4" />
+          Fotografía Clínica (Antes/Después)
+        </button>
+        <button
+          onClick={() => setActiveTab('comunicaciones')}
+          className={`px-4 sm:px-6 py-3 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 flex-shrink-0 ${
+            activeTab === 'comunicaciones' 
+              ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          Recordatorios & WhatsApp
         </button>
       </div>
 
@@ -2302,12 +2380,14 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
+                    onClick={() => setSigningId(null)}
                     className="fixed inset-0 bg-slate-900/80 dark:bg-slate-950/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 md:p-4"
                   >
                     <motion.div 
                       initial={{ y: 50, scale: 0.95 }}
                       animate={{ y: 0, scale: 1 }}
                       exit={{ y: 50, scale: 0.95 }}
+                      onClick={(e) => e.stopPropagation()}
                       className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] overflow-hidden"
                     >
                       {/* Modal Header */}
@@ -2394,6 +2474,39 @@ Acepto y entiendo los siguientes riesgos clínicos y advertencias fundamentales:
                   </motion.div>
                 )}
               </AnimatePresence>
+            </motion.div>
+          )}
+
+          {activeTab === 'fotografia' && (
+            <motion.div
+              key="fotografia"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+            >
+              <ClinicalPhotography
+                patient={patient}
+                onUpdatePatient={onUpdatePatient}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'comunicaciones' && (
+            <motion.div
+              key="comunicaciones"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+            >
+              <PatientCommunications
+                patient={patient}
+                appointments={[]}
+                clinicName="PerioClinic Pro"
+                doctorName="Dr. Titular"
+                onUpdatePatient={onUpdatePatient}
+              />
             </motion.div>
           )}
 

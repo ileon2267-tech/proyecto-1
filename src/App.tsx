@@ -6,9 +6,10 @@ import {
   createEmptyOdontogram, 
   createEmptyPeriodontogram 
 } from "./initialData";
+import { formatRut } from "./utils/rutUtils";
 import { db, handleFirestoreError, OperationType, auth, cleanForFirestore } from "./firebase";
 import { signInAnonymously } from "firebase/auth";
-import { collection, doc, setDoc, getDocs, deleteDoc, getDocFromServer } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs, deleteDoc, getDocFromServer, onSnapshot } from "firebase/firestore";
 
 // Critical First-Paint Components (Eager Load)
 import KPIDashboard from "./components/KPIDashboard";
@@ -20,6 +21,10 @@ import Logo from "./components/Logo";
 import LoginScreen from "./components/LoginScreen";
 import MobileBottomDock from "./components/MobileBottomDock";
 import MobileNavigationDrawer from "./components/MobileNavigationDrawer";
+import NetworkStatusIndicator from "./components/NetworkStatusIndicator";
+import MobileConsentSign from "./components/MobileConsentSign";
+import ExternalPatientPortal from "./components/ExternalPatientPortal";
+import { ClinicalFlowTracker } from "./components/ClinicalFlowTracker";
 
 // Secondary & Auxiliary Views (Code-Split / Lazy Load for Ultra-Fast App Startup & Low Memory)
 const Agenda = lazy(() => import("./components/Agenda"));
@@ -40,7 +45,7 @@ const SpecialtyWorkspace = lazy(() => import("./components/SpecialtyWorkspace"))
 const InteractiveHelpPanel = lazy(() => import("./components/InteractiveHelpPanel"));
 const KeyboardShortcutsModal = lazy(() => import("./components/KeyboardShortcutsModal"));
 const PatientDirectory = lazy(() => import("./components/PatientDirectory"));
-const ClinicalFlowTracker = lazy(() => import("./components/ClinicalFlowTracker").then(m => ({ default: m.ClinicalFlowTracker })));
+const DataBackupExport = lazy(() => import("./components/DataBackupExport"));
 
 // Ultra-lightweight Clinical Suspense Skeleton
 function ClinicalViewSkeleton() {
@@ -96,7 +101,9 @@ import {
   TrendingUp,
   HeartPulse,
   Columns,
-  Menu
+  Menu,
+  X,
+  ArrowLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -242,6 +249,12 @@ export default function App() {
         return;
       }
 
+      if (e.key === "Escape") {
+        if (deletingPatientId) setDeletingPatientId(null);
+        if (showShareModal) setShowShareModal(false);
+        if (isMobileDrawerOpen) setIsMobileDrawerOpen(false);
+      }
+
       // Ignore when typing in input, textarea or contenteditable
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
@@ -291,6 +304,7 @@ export default function App() {
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [newPatientName, setNewPatientName] = useState("");
+  const [newPatientRut, setNewPatientRut] = useState("");
   const [newPatientPhone, setNewPatientPhone] = useState("");
   const [newPatientEmail, setNewPatientEmail] = useState("");
   const [newPatientBirthdate, setNewPatientBirthdate] = useState("");
@@ -299,10 +313,14 @@ export default function App() {
   // Patient Search query
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Firebase Sync Loading state
+  // Firebase Sync Loading state & Real-time Listeners
   const [isSyncingFirebase, setIsSyncingFirebase] = useState(true);
   const [firebaseSyncError, setFirebaseSyncError] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [lastSyncedTime, setLastSyncedTime] = useState<Date | null>(null);
+
+  // Flag to know whether an update came from incoming remote snapshot (to avoid echo write cycles)
+  const isIncomingRemoteUpdateRef = useRef(false);
 
   // Keep track of previously synced patients and appointments to do differential synchronization
   const prevPatientsRef = useRef<Patient[]>([]);
@@ -347,88 +365,129 @@ export default function App() {
 
   // Validate Firestore Connection
   useEffect(() => {
-    if (!isAuthReady) return;
+    let isCancelled = false;
     async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-        console.log("Conexión con Cloud Firestore Enterprise validada.");
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration or network.");
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (isCancelled) return;
+        try {
+          await getDocFromServer(doc(db, 'test', 'connection'));
+          console.log("Conexión con Cloud Firestore validada exitosamente.");
+          setFirebaseSyncError(null);
+          return;
+        } catch (error) {
+          if (attempt < 2) {
+            await new Promise(res => setTimeout(res, 800));
+          } else {
+            console.log("Almacenamiento persistente local activo (modo offline/fallback).");
+            setFirebaseSyncError("Modo local activo");
+          }
         }
       }
     }
-    testConnection();
+    if (isAuthReady) {
+      testConnection();
+    }
+    return () => {
+      isCancelled = true;
+    };
   }, [isAuthReady]);
 
-  // Fetch initial data from Firestore
+  // Real-time bidirectional listeners (onSnapshot) for Multi-Device synchronization
   useEffect(() => {
     if (!isAuthReady) return;
-    async function loadData() {
-      setIsSyncingFirebase(true);
-      try {
-        const patientsSnap = await getDocs(collection(db, "patients"));
-        let dbPatients: Patient[] = [];
-        patientsSnap.forEach((docSnap) => {
-          dbPatients.push(docSnap.data() as Patient);
-        });
+    setIsSyncingFirebase(true);
 
-        const appointmentsSnap = await getDocs(collection(db, "appointments"));
-        let dbAppointments: Appointment[] = [];
-        appointmentsSnap.forEach((docSnap) => {
-          dbAppointments.push(docSnap.data() as Appointment);
-        });
+    let isInitialPatientsLoad = true;
+    let isInitialAppointmentsLoad = true;
 
-        if (dbPatients.length > 0) {
-          setPatients(dbPatients);
-          prevPatientsRef.current = dbPatients;
-          if (activePatientId && dbPatients.some(p => p.id === activePatientId)) {
-            // Keep current
-          } else {
-            setActivePatientId("");
-          }
-        } else {
+    // Listen to Patients collection in real time
+    const unsubPatients = onSnapshot(
+      collection(db, "patients"),
+      async (snapshot) => {
+        if (snapshot.empty && isInitialPatientsLoad) {
+          isInitialPatientsLoad = false;
           // SEED FIRST TIME
-          console.log("Base de datos vacía, inicializando con pacientes por defecto...");
+          console.log("Base de datos de pacientes vacía, sembrando iniciales...");
           for (const patient of INITIAL_PATIENTS) {
             await setDoc(doc(db, "patients", patient.id), cleanForFirestore(patient));
           }
           setPatients(INITIAL_PATIENTS);
           prevPatientsRef.current = INITIAL_PATIENTS;
+          setIsSyncingFirebase(false);
+          setLastSyncedTime(new Date());
+          return;
         }
 
-        if (dbAppointments.length > 0) {
-          setAppointments(dbAppointments);
-          prevAppointmentsRef.current = dbAppointments;
-        } else {
+        isInitialPatientsLoad = false;
+        const remotePatients: Patient[] = [];
+        snapshot.forEach((docSnap) => {
+          remotePatients.push(docSnap.data() as Patient);
+        });
+
+        if (remotePatients.length > 0) {
+          isIncomingRemoteUpdateRef.current = true;
+          setPatients(remotePatients);
+          prevPatientsRef.current = remotePatients;
+          setLastSyncedTime(new Date());
+          setFirebaseSyncError(null);
+          setTimeout(() => {
+            isIncomingRemoteUpdateRef.current = false;
+          }, 300);
+        }
+        setIsSyncingFirebase(false);
+      },
+      (error) => {
+        console.log("Sincronización en tiempo real operando con respaldo local:", error?.message || error);
+        setFirebaseSyncError("Modo local activo");
+        setIsSyncingFirebase(false);
+      }
+    );
+
+    // Listen to Appointments collection in real time
+    const unsubAppointments = onSnapshot(
+      collection(db, "appointments"),
+      async (snapshot) => {
+        if (snapshot.empty && isInitialAppointmentsLoad) {
+          isInitialAppointmentsLoad = false;
           // SEED FIRST TIME
-          console.log("Base de datos de citas vacía, inicializando por defecto...");
+          console.log("Base de datos de citas vacía, sembrando citas iniciales...");
           for (const app of INITIAL_APPOINTMENTS) {
             await setDoc(doc(db, "appointments", app.id), cleanForFirestore(app));
           }
           setAppointments(INITIAL_APPOINTMENTS);
           prevAppointmentsRef.current = INITIAL_APPOINTMENTS;
+          return;
         }
-      } catch (error) {
-        console.error("Error al cargar datos desde Firebase Firestore:", error);
-        setFirebaseSyncError("Se está utilizando el respaldo de memoria local temporal.");
-        try {
-          handleFirestoreError(error, OperationType.LIST, "patients");
-        } catch (wrappedErr) {
-          // Logged
+
+        isInitialAppointmentsLoad = false;
+        const remoteAppointments: Appointment[] = [];
+        snapshot.forEach((docSnap) => {
+          remoteAppointments.push(docSnap.data() as Appointment);
+        });
+
+        if (remoteAppointments.length > 0) {
+          isIncomingRemoteUpdateRef.current = true;
+          setAppointments(remoteAppointments);
+          prevAppointmentsRef.current = remoteAppointments;
+          setTimeout(() => {
+            isIncomingRemoteUpdateRef.current = false;
+          }, 300);
         }
-      } finally {
-        setIsSyncingFirebase(false);
+      },
+      (error) => {
+        console.log("Sincronización de citas operando con respaldo local:", error?.message || error);
       }
-    }
-    loadData();
+    );
+
+    return () => {
+      unsubPatients();
+      unsubAppointments();
+    };
   }, [isAuthReady]);
 
-  // Sync state modifications dynamically with debouncing to prevent UI freeze and Firestore rate limits
+  // Sync locally made modifications to Firestore (with debouncing)
   useEffect(() => {
-    if (isSyncingFirebase) return;
-    
-    // Asynchronously debounced local storage backup (prevents freezing main thread during rapid probing/typing)
+    // Asynchronously debounced local storage backup (always fast)
     const localTimer = setTimeout(() => {
       try {
         localStorage.setItem("perioPatients", JSON.stringify(patients));
@@ -437,9 +496,15 @@ export default function App() {
       }
     }, 350);
 
+    // Don't echo remote snapshot updates back to the server
+    if (isIncomingRemoteUpdateRef.current) {
+      return () => clearTimeout(localTimer);
+    }
+
     const cloudTimer = setTimeout(() => {
       async function syncPatientsToCloud() {
         const prevList = prevPatientsRef.current;
+        let didMutate = false;
         
         // Update/Create Patient
         for (const p of patients) {
@@ -447,6 +512,7 @@ export default function App() {
           if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(p)) {
             try {
               await setDoc(doc(db, "patients", p.id), cleanForFirestore(p));
+              didMutate = true;
               console.log(`Durable Cloud Sync: Actualizado paciente ${p.name}`);
             } catch (err) {
               console.error(`Error de guardado en la nube para paciente ${p.name}:`, err);
@@ -459,6 +525,7 @@ export default function App() {
           if (!patients.some(p => p.id === prev.id)) {
             try {
               await deleteDoc(doc(db, "patients", prev.id));
+              didMutate = true;
               console.log(`Durable Cloud Sync: Eliminado paciente ${prev.name}`);
             } catch (err) {
               console.error(`Error al eliminar paciente ${prev.name} en la nube:`, err);
@@ -467,20 +534,21 @@ export default function App() {
         }
 
         prevPatientsRef.current = patients;
+        if (didMutate) {
+          setLastSyncedTime(new Date());
+        }
       }
 
       syncPatientsToCloud();
-    }, 2000); // 2-second debounce for Firestore patients sync
+    }, 1200); // 1.2-second debounce for responsive syncing across devices
 
     return () => {
       clearTimeout(localTimer);
       clearTimeout(cloudTimer);
     };
-  }, [patients, isSyncingFirebase]);
+  }, [patients]);
 
   useEffect(() => {
-    if (isSyncingFirebase) return;
-
     // Asynchronously debounced local storage backup
     const localTimer = setTimeout(() => {
       try {
@@ -490,9 +558,15 @@ export default function App() {
       }
     }, 350);
 
+    // Don't echo remote snapshot updates back to the server
+    if (isIncomingRemoteUpdateRef.current) {
+      return () => clearTimeout(localTimer);
+    }
+
     const cloudTimer = setTimeout(() => {
       async function syncAppointmentsToCloud() {
         const prevList = prevAppointmentsRef.current;
+        let didMutate = false;
 
         // Update/Create Appointment
         for (const app of appointments) {
@@ -500,6 +574,7 @@ export default function App() {
           if (!prevVersion || JSON.stringify(prevVersion) !== JSON.stringify(app)) {
             try {
               await setDoc(doc(db, "appointments", app.id), cleanForFirestore(app));
+              didMutate = true;
               console.log(`Durable Cloud Sync: Actualizada cita ${app.id}`);
             } catch (err) {
               console.error(`Error de guardado en la nube para cita ${app.id}:`, err);
@@ -512,6 +587,7 @@ export default function App() {
           if (!appointments.some(app => app.id === prev.id)) {
             try {
               await deleteDoc(doc(db, "appointments", prev.id));
+              didMutate = true;
               console.log(`Durable Cloud Sync: Eliminada cita ${prev.id}`);
             } catch (err) {
               console.error(`Error al eliminar cita ${prev.id} en la nube:`, err);
@@ -520,16 +596,19 @@ export default function App() {
         }
 
         prevAppointmentsRef.current = appointments;
+        if (didMutate) {
+          setLastSyncedTime(new Date());
+        }
       }
 
       syncAppointmentsToCloud();
-    }, 2000); // 2-second debounce for Firestore appointments sync
+    }, 1200); // 1.2-second debounce for appointment syncing
 
     return () => {
       clearTimeout(localTimer);
       clearTimeout(cloudTimer);
     };
-  }, [appointments, isSyncingFirebase]);
+  }, [appointments]);
 
   useEffect(() => {
     localStorage.setItem("perioActivePatientId", activePatientId);
@@ -585,12 +664,15 @@ export default function App() {
     e.preventDefault();
     if (!newPatientName.trim()) return;
 
+    const formattedRutVal = newPatientRut.trim() ? formatRut(newPatientRut.trim()) : undefined;
+
     if (editingPatientId) {
       setPatients(prev => prev.map(p => {
         if (p.id === editingPatientId) {
           return {
             ...p,
             name: newPatientName,
+            rut: formattedRutVal || p.rut,
             phone: newPatientPhone,
             email: newPatientEmail,
             birthdate: newPatientBirthdate || p.birthdate,
@@ -603,6 +685,7 @@ export default function App() {
       const newPat: Patient = {
         id: `pat-${Date.now()}`,
         name: newPatientName,
+        rut: formattedRutVal,
         phone: newPatientPhone,
         email: newPatientEmail,
         birthdate: newPatientBirthdate || "1990-01-01",
@@ -634,17 +717,19 @@ export default function App() {
     
     // Clear registration fields
     setNewPatientName("");
+    setNewPatientRut("");
     setNewPatientPhone("");
     setNewPatientEmail("");
     setNewPatientBirthdate("");
     setNewPatientNotes("");
     setEditingPatientId(null);
     setShowRegisterForm(false);
-  }, [newPatientName, editingPatientId, newPatientPhone, newPatientEmail, newPatientBirthdate, newPatientNotes]);
+  }, [newPatientName, newPatientRut, editingPatientId, newPatientPhone, newPatientEmail, newPatientBirthdate, newPatientNotes]);
 
   const startEditPatient = useCallback((p: Patient) => {
     setEditingPatientId(p.id);
     setNewPatientName(p.name);
+    setNewPatientRut(p.rut || p.dni || "");
     setNewPatientPhone(p.phone);
     setNewPatientEmail(p.email);
     setNewPatientBirthdate(p.birthdate);
@@ -803,7 +888,7 @@ export default function App() {
                     </div>
                     <div className="text-[11px] text-slate-400 mt-0.5 font-normal truncate">
                       {activePatient ? (
-                        <span>Exp. #{activePatient.id} • 📞 {activePatient.phone} • 🎂 {activePatient.birthdate}</span>
+                        <span>{activePatient.rut ? <strong className="font-mono text-teal-600 dark:text-teal-400 mr-1.5">RUT: {activePatient.rut} •</strong> : null}Exp. #{activePatient.id} • 📞 {activePatient.phone} • 🎂 {activePatient.birthdate}</span>
                       ) : (
                         "Selecciona un expediente para comenzar la sesión clínica"
                       )}
@@ -821,7 +906,7 @@ export default function App() {
                     <option value="">Buscar expediente...</option>
                     {patients.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name}
+                        {p.name} {p.rut ? `(${p.rut})` : `(ID: ${p.id.split('-')[1] || p.id})`}
                       </option>
                     ))}
                   </select>
@@ -1032,8 +1117,22 @@ export default function App() {
                           })}
                         </div>
 
-                        {/* Right Quick Controls (Zen Toggle) */}
+                        {/* Right Quick Controls (Return to Directory & Zen Toggle) */}
                         <div className="flex items-center gap-2 shrink-0">
+                          {activePatientId && (
+                            <button
+                              onClick={() => {
+                                setActivePatientId("");
+                                setActiveTab("pacientes");
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700"
+                              title="Volver a la lista de todos los pacientes"
+                            >
+                              <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                              <span className="hidden sm:inline">Directorio Pacientes</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               const nextZen = !isZenMode;
@@ -1240,7 +1339,7 @@ export default function App() {
                             {p.name}
                           </h4>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                            🎂 {p.birthdate}  |  📞 {p.phone}
+                            {p.rut ? <span className="font-mono text-teal-600 dark:text-teal-400 font-bold mr-1">RUT: {p.rut} •</span> : null}🎂 {p.birthdate}  |  📞 {p.phone}
                           </p>
                         </div>
 
@@ -1344,6 +1443,8 @@ export default function App() {
             handleRegisterPatient={handleRegisterPatient}
             newPatientName={newPatientName}
             setNewPatientName={setNewPatientName}
+            newPatientRut={newPatientRut}
+            setNewPatientRut={setNewPatientRut}
             newPatientPhone={newPatientPhone}
             setNewPatientPhone={setNewPatientPhone}
             newPatientEmail={newPatientEmail}
@@ -1540,6 +1641,19 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* INTEGRATED BACKUP & DATA EXPORT ENGINE */}
+            <DataBackupExport
+              patients={patients}
+              appointments={appointments}
+              aranceles={aranceles}
+              onRestoreData={(restoredPatients, restoredAppointments) => {
+                setPatients(restoredPatients);
+                if (restoredAppointments.length > 0) {
+                  setAppointments(restoredAppointments);
+                }
+              }}
+            />
           </div>
         );
 
@@ -1547,6 +1661,19 @@ export default function App() {
         return null;
     }
   };
+
+  // Direct Patient Mobile Consent Remote Signing Portal (Bypasses Doctor Auth for Patients)
+  const urlParams = new URLSearchParams(window.location.search);
+  const signSessionParam = urlParams.get("sign_session") || urlParams.get("consent_session");
+  if (signSessionParam) {
+    return <MobileConsentSign sessionId={signSessionParam} />;
+  }
+
+  // External Patient Portal Access (Bypasses Doctor Auth for Patients accessing their personal file)
+  const portalPatientParam = urlParams.get("portal_patient") || urlParams.get("patient_portal") || urlParams.get("portal");
+  if (portalPatientParam) {
+    return <ExternalPatientPortal accessKey={portalPatientParam} />;
+  }
 
   if (!isLoggedIn) {
     return (
@@ -1875,6 +2002,24 @@ export default function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Live Real-Time Date Pill */}
+            <div 
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 shadow-2xs"
+              title="Fecha actual del sistema clínico"
+            >
+              <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span className="capitalize">
+                {new Date().toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+              </span>
+            </div>
+
+            {/* Network Cloud Sync Indicator */}
+            <NetworkStatusIndicator
+              isSyncing={isSyncingFirebase}
+              syncError={firebaseSyncError}
+              lastSyncedTime={lastSyncedTime}
+            />
+
             {/* Quick Search */}
             <button 
               onClick={() => window.dispatchEvent(new CustomEvent("periodash-open-search"))}
@@ -1965,14 +2110,22 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[260] flex items-center justify-center p-4"
+              onClick={() => setDeletingPatientId(null)}
+              className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[260] flex items-center justify-center p-4 overflow-y-auto"
             >
               <motion.div
                 initial={{ scale: 0.95, y: 15 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.95, y: 15 }}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative"
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto my-auto"
               >
+                <button 
+                  onClick={() => setDeletingPatientId(null)}
+                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
                 <div className="space-y-4">
                   <div className="w-12 h-12 bg-red-500/10 text-red-650 dark:text-red-400 rounded-2xl flex items-center justify-center border border-red-500/20 animate-pulse">
                     <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />

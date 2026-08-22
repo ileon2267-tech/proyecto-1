@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ToothState } from "../types";
 import { UPPER_TEETH, LOWER_TEETH } from "../initialData";
-import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, Wand2 } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, Wand2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface OdontogramaProps {
@@ -16,6 +16,17 @@ function OdontogramaComponent({ odontogram, onChange }: OdontogramaProps) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(11);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [archFilter, setArchFilter] = useState<"all" | "upper" | "lower">("all");
+
+  useEffect(() => {
+    if (!showResetConfirm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowResetConfirm(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showResetConfirm]);
 
   const handleSurfaceClick = (toothNum: number, surface: keyof ToothState["surfaces"]) => {
     const updated = { ...odontogram };
@@ -462,14 +473,26 @@ function OdontogramaComponent({ odontogram, onChange }: OdontogramaProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[200] flex items-center justify-center p-4"
+            onClick={() => setShowResetConfirm(false)}
+            className="fixed inset-0 bg-[#09090b]/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-y-auto"
           >
             <motion.div
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-[2rem] max-w-sm w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto my-auto flex flex-col"
             >
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full cursor-pointer transition-all duration-150"
+                title="Cerrar ventana"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
               <div className="space-y-4">
                 <div className="w-12 h-12 bg-red-500/10 text-red-650 dark:text-red-400 rounded-2xl flex items-center justify-center border border-red-500/10">
                   <RefreshCw className="w-5 h-5 text-red-500 animate-spin" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Patient, PeriodontogramVisit, PeriodonState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -83,6 +83,17 @@ export default function PeriodontogramComparisonModal({
   const [visitAId, setVisitAId] = useState<string>(history[0]?.id || 'current');
   const [visitBId, setVisitBId] = useState<string>(history[1]?.id || 'current');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   // Resolve snapshot A and snapshot B
@@ -125,15 +136,19 @@ export default function PeriodontogramComparisonModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
+      <div 
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print overflow-y-auto"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[90vh]"
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[90vh] my-auto"
         >
           {/* Header */}
-          <div className="p-6 bg-gradient-to-r from-teal-700 to-emerald-800 text-white flex items-center justify-between">
+          <div className="p-6 bg-gradient-to-r from-teal-700 to-emerald-800 text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md">
                 <History className="w-6 h-6 text-teal-200" />
@@ -145,14 +160,14 @@ export default function PeriodontogramComparisonModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-5 h-5 text-white" />
             </button>
           </div>
 
           {/* Action Bar for Snapshot creation */}
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
               Histórico de Sondajes: <strong className="text-teal-600 dark:text-teal-400">{history.length + 1} registros</strong>
             </span>
